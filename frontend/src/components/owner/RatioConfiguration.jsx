@@ -17,7 +17,8 @@ const RatioConfiguration = () => {
   const [ratios, setRatios] = useState({
     flour: 70,
     fruska: 25,
-    fruskelo: 5
+    fruskelo: 3,
+    waste: 2
   });
 
   const handleRatioChange = (type, value) => {
