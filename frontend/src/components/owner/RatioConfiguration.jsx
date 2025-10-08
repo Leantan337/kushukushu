@@ -30,7 +30,7 @@ const RatioConfiguration = () => {
   };
 
   const getTotalPercentage = () => {
-    return ratios.flour + ratios.fruska + ratios.fruskelo;
+    return ratios.flour + ratios.fruska + ratios.fruskelo + ratios.waste;
   };
 
   const handleSave = () => {
