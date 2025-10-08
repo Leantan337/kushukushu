@@ -268,6 +268,20 @@ const OwnerDashboard = () => {
             <CheckCircle className="w-5 h-5" />
             <span>Approvals</span>
           </Button>
+          <Button
+            onClick={() => navigate("/reports")}
+            className="h-16 bg-blue-600 hover:bg-blue-700 text-white font-medium flex items-center justify-center space-x-2"
+          >
+            <FileBarChart className="w-5 h-5" />
+            <span>Reports</span>
+          </Button>
+          <Button
+            onClick={() => navigate("/user-management")}
+            className="h-16 bg-purple-600 hover:bg-purple-700 text-white font-medium flex items-center justify-center space-x-2"
+          >
+            <UserCog className="w-5 h-5" />
+            <span>User Management</span>
+          </Button>
         </div>
       </div>
     </div>
