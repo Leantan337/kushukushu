@@ -256,6 +256,19 @@ const AdminDashboard = () => {
                   3
                 </Badge>
               </Button>
+
+              <Button
+                variant="outline"
+                onClick={() => {
+                  localStorage.clear();
+                  sessionStorage.clear();
+                  navigate("/");
+                }}
+                className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-300"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Logout
+              </Button>
             </div>
           </div>
         </div>
