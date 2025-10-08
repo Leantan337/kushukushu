@@ -12,6 +12,7 @@ const UnifiedLogin = () => {
   const [password, setPassword] = useState("");
   const [showRoleSelection, setShowRoleSelection] = useState(false);
   const [selectedRole, setSelectedRole] = useState("");
+  const [selectedBranch, setSelectedBranch] = useState("");
   const navigate = useNavigate();
 
   const roles = [
@@ -20,7 +21,12 @@ const UnifiedLogin = () => {
     { value: "finance", label: "Finance", route: "/finance/dashboard" },
     { value: "manager", label: "Manager", route: "/manager/dashboard" },
     { value: "sales", label: "Sales", route: "/sales/dashboard" },
-    { value: "storekeeper", label: "Store Keeper", route: "/storekeeper/dashboard" }
+    { value: "storekeeper", label: "Store Keeper", route: "/storekeeper/dashboard", needsBranch: true }
+  ];
+
+  const branches = [
+    { value: "berhane", label: "Berhane Branch" },
+    { value: "girmay", label: "Girmay Branch" }
   ];
 
   const handleCredentialsSubmit = (e) => {
@@ -34,7 +40,22 @@ const UnifiedLogin = () => {
   const handleRoleSelection = () => {
     if (selectedRole) {
       const role = roles.find(r => r.value === selectedRole);
+      
+      // If role needs branch and no branch selected, return
+      if (role && role.needsBranch && !selectedBranch) {
+        return;
+      }
+      
       if (role) {
+        // Store user info in localStorage
+        const userInfo = {
+          username: username,
+          role: selectedRole,
+          name: username,
+          branch: selectedBranch || "main"
+        };
+        localStorage.setItem('user', JSON.stringify(userInfo));
+        
         navigate(role.route);
       }
     }
@@ -114,7 +135,11 @@ const UnifiedLogin = () => {
                   <UserCircle className="w-5 h-5 mr-2" />
                   Select Role
                 </Label>
-                <Select value={selectedRole} onValueChange={setSelectedRole}>
+                <Select value={selectedRole} onValueChange={(value) => {
+                  setSelectedRole(value);
+                  // Reset branch when role changes
+                  setSelectedBranch("");
+                }}>
                   <SelectTrigger className="h-12 border-slate-200 focus:border-slate-400 focus:ring-slate-400">
                     <SelectValue placeholder="Choose your role..." />
                   </SelectTrigger>
@@ -128,12 +153,38 @@ const UnifiedLogin = () => {
                 </Select>
               </div>
 
+              {/* Show branch selection only for storekeeper role */}
+              {selectedRole === "storekeeper" && (
+                <div className="space-y-2">
+                  <Label htmlFor="branch" className="text-slate-700 font-medium flex items-center">
+                    <Building2 className="w-5 h-5 mr-2" />
+                    Select Branch
+                  </Label>
+                  <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+                    <SelectTrigger className="h-12 border-slate-200 focus:border-slate-400 focus:ring-slate-400">
+                      <SelectValue placeholder="Choose your branch..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {branches.map((branch) => (
+                        <SelectItem key={branch.value} value={branch.value}>
+                          {branch.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-slate-500 mt-1">
+                    You will only see products and orders for your selected branch
+                  </p>
+                </div>
+              )}
+
               <div className="flex space-x-3">
                 <Button 
                   variant="outline"
                   onClick={() => {
                     setShowRoleSelection(false);
                     setSelectedRole("");
+                    setSelectedBranch("");
                   }}
                   className="flex-1 h-12 border-slate-200 hover:bg-slate-50"
                 >
@@ -141,7 +192,7 @@ const UnifiedLogin = () => {
                 </Button>
                 <Button 
                   onClick={handleRoleSelection}
-                  disabled={!selectedRole}
+                  disabled={!selectedRole || (selectedRole === "storekeeper" && !selectedBranch)}
                   className="flex-1 h-12 bg-slate-900 hover:bg-slate-800 text-white font-medium transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Login

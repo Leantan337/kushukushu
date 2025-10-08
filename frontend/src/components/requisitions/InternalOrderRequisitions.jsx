@@ -17,7 +17,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 
-const InternalOrderRequisitions = ({ userRole = "sales" }) => {
+const InternalOrderRequisitions = ({ userRole = "sales", userBranch = null }) => {
   const [orders, setOrders] = useState([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showActionModal, setShowActionModal] = useState(false);
@@ -51,12 +51,20 @@ const InternalOrderRequisitions = ({ userRole = "sales" }) => {
 
   useEffect(() => {
     fetchOrders();
-  }, []);
+  }, [userBranch]);
 
   const fetchOrders = async () => {
     try {
       const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
-      const response = await fetch(`${backendUrl}/internal-orders`);
+      
+      // For storekeepers, fetch stock requests for their branch only
+      let url = `${backendUrl}/api/internal-orders`;
+      if (userRole === "store_keeper" && userBranch) {
+        // Storekeepers see requests where they are the source (fulfillment)
+        url = `${backendUrl}/api/stock-requests?source_branch=${userBranch}&status=pending_fulfillment`;
+      }
+      
+      const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
         setOrders(data);

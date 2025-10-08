@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -11,42 +11,65 @@ import { useToast } from "../../hooks/use-toast";
 const InventoryRequestForm = () => {
   const { toast } = useToast();
   const [formData, setFormData] = useState({
-    product_name: "1st Quality 50kg",
+    product_name: "",
     package_size: "50kg",
     num_packages: "",
     reason: "",
-    branch_id: "sales_branch" // Replace with actual branch
+    branch_id: "berhane" // User's sales branch
   });
   const [loading, setLoading] = useState(false);
+  const [availableProducts, setAvailableProducts] = useState([]);
 
   const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 
+  // Package size options
   const packageSizes = [
-    { value: "50kg", label: "50 kg" },
     { value: "25kg", label: "25 kg" },
-    { value: "15kg", label: "15 kg" },
-    { value: "10kg", label: "10 kg" },
-    { value: "5kg", label: "5 kg" }
+    { value: "50kg", label: "50 kg" },
+    { value: "100kg", label: "100 kg" }
   ];
 
-  const products = [
-    { value: "1st Quality 50kg", label: "1st Quality Flour 50kg" },
-    { value: "1st Quality 25kg", label: "1st Quality Flour 25kg" },
-    { value: "1st Quality 15kg", label: "1st Quality Flour 15kg" },
-    { value: "1st Quality 5kg", label: "1st Quality Flour 5kg" },
-    { value: "Bread Flour 50kg", label: "Bread Flour 50kg" },
-    { value: "Bread Flour 25kg", label: "Bread Flour 25kg" },
-    { value: "White Fruskela", label: "White Fruskela (Bran)" },
-    { value: "Red Fruskela", label: "Red Fruskela (Bran)" },
-    { value: "Furska", label: "Furska (Bran)" }
-  ];
+  useEffect(() => {
+    fetchAvailableProducts();
+  }, []);
+
+  const fetchAvailableProducts = async () => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/inventory`);
+      if (response.ok) {
+        const data = await response.json();
+        // Get unique products (excluding service items)
+        const products = data
+          .filter(item => item.is_sellable !== false && item.category !== "service")
+          .map(item => ({
+            value: item.name,
+            label: `${item.name} (${item.branch_name})`,
+            branch: item.branch_id
+          }));
+        
+        // Remove duplicates by name
+        const unique = products.filter((product, index, self) =>
+          index === self.findIndex((p) => p.value === product.value && p.branch === product.branch)
+        );
+        
+        setAvailableProducts(unique);
+        if (unique.length > 0 && !formData.product_name) {
+          setFormData(prev => ({ ...prev, product_name: unique[0].value }));
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching products:", error);
+    }
+  };
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const calculateTotalWeight = () => {
-    return parseInt(formData.package_size || 0) * parseInt(formData.num_packages || 0);
+    // Extract numeric value from package_size (e.g., "50kg" -> 50)
+    const sizeValue = parseInt(formData.package_size) || 0;
+    return sizeValue * parseInt(formData.num_packages || 0);
   };
 
   const handleSubmit = async (e) => {
@@ -134,16 +157,19 @@ const InventoryRequestForm = () => {
                 onValueChange={(value) => handleChange("product_name", value)}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Select product..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {products.map((product) => (
-                    <SelectItem key={product.value} value={product.value}>
+                  {availableProducts.map((product) => (
+                    <SelectItem key={`${product.value}-${product.branch}`} value={product.value}>
                       {product.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-slate-500">
+                Products shown from all branches - will auto-route to correct source
+              </p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -185,7 +211,7 @@ const InventoryRequestForm = () => {
                   <span className="font-semibold">Total Weight:</span> {calculateTotalWeight()} kg
                 </p>
                 <p className="text-xs text-blue-700 mt-1">
-                  {formData.num_packages} packages × {formData.package_size} kg
+                  {formData.num_packages} packages × {formData.package_size}
                 </p>
               </div>
             )}

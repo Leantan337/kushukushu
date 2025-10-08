@@ -16,7 +16,7 @@ import {
   Filter
 } from 'lucide-react';
 
-const InventoryManagement = ({ userRole = "store_keeper" }) => {
+const InventoryManagement = ({ userRole = "store_keeper", userBranch = null }) => {
   const [inventoryItems, setInventoryItems] = useState([]);
   const [selectedItem, setSelectedItem] = useState(null);
   const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
@@ -32,12 +32,14 @@ const InventoryManagement = ({ userRole = "store_keeper" }) => {
   // Fetch inventory data
   useEffect(() => {
     fetchInventory();
-  }, []);
+  }, [userBranch]);
 
   const fetchInventory = async () => {
     try {
       const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
-      const response = await fetch(`${backendUrl}/inventory`);
+      // Add branch filter if userBranch is provided (for storekeepers)
+      const branchParam = userBranch ? `?branch_id=${userBranch}` : '';
+      const response = await fetch(`${backendUrl}/api/inventory${branchParam}`);
       if (response.ok) {
         const data = await response.json();
         setInventoryItems(data);

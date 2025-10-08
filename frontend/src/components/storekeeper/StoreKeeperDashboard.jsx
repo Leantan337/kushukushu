@@ -30,21 +30,19 @@ const StoreKeeperDashboard = () => {
     try {
       const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
       
-      // Fetch inventory stats
-      const inventoryResponse = await fetch(`${backendUrl}/api/inventory`);
+      // Fetch inventory stats - filter by branch
+      const inventoryResponse = await fetch(`${backendUrl}/api/inventory?branch_id=${userBranch}`);
       const inventoryData = await inventoryResponse.json();
       
-      // Fetch pending internal orders for fulfillment
-      const ordersResponse = await fetch(`${backendUrl}/api/internal-orders`);
+      // Fetch pending internal orders for fulfillment - filter by source_branch
+      const ordersResponse = await fetch(`${backendUrl}/api/stock-requests?source_branch=${userBranch}&status=pending_fulfillment`);
       const ordersData = await ordersResponse.json();
       
       const totalItems = inventoryData.length;
       const lowStockItems = inventoryData.filter(item => 
         item.stock_level === 'low' || item.stock_level === 'critical'
       ).length;
-      const pendingFulfillments = ordersData.filter(order => 
-        order.status === 'approved'
-      ).length;
+      const pendingFulfillments = ordersData.length;
 
       setStats({
         totalItems,
@@ -61,8 +59,8 @@ const StoreKeeperDashboard = () => {
     try {
       const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
       
-      // Fetch recent audit logs
-      const auditResponse = await fetch(`${backendUrl}/api/audit-logs?limit=10`);
+      // Fetch recent audit logs - filter by branch
+      const auditResponse = await fetch(`${backendUrl}/api/audit-logs?branch_id=${userBranch}&limit=10`);
       const auditData = await auditResponse.json();
       
       const activities = auditData.map(log => ({
@@ -80,13 +78,13 @@ const StoreKeeperDashboard = () => {
         {
           id: 1,
           timestamp: new Date().toLocaleTimeString(),
-          description: 'Stock level updated for 1st Quality Flour',
+          description: `Stock level updated for ${userBranch === 'berhane' ? 'Bread Flour' : '1st Quality Flour'}`,
           type: 'inventory_update'
         },
         {
           id: 2,
           timestamp: new Date(Date.now() - 1000 * 60 * 15).toLocaleTimeString(),
-          description: 'Internal order fulfilled - 500kg Bread Flour',
+          description: `Internal order fulfilled - ${userBranch} branch`,
           type: 'order_fulfillment'
         }
       ]);
@@ -210,10 +208,10 @@ const StoreKeeperDashboard = () => {
         );
 
       case 'inventory':
-        return <InventoryManagement userRole="store_keeper" />;
+        return <InventoryManagement userRole="store_keeper" userBranch={userBranch} />;
 
       case 'fulfillment':
-        return <InternalOrderRequisitions userRole="store_keeper" />;
+        return <InternalOrderRequisitions userRole="store_keeper" userBranch={userBranch} />;
 
       default:
         return <div>Tab content not found</div>;
@@ -228,7 +226,10 @@ const StoreKeeperDashboard = () => {
           <div className="flex justify-between items-center py-4">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Store Keeper Dashboard</h1>
-              <p className="text-sm text-gray-600">Welcome back, {userName} ({userBranch})</p>
+              <p className="text-sm text-gray-600">Welcome back, {userName}</p>
+              <p className="text-xs text-blue-600 font-semibold mt-1">
+                📍 {userBranch === 'berhane' ? 'Berhane Branch' : userBranch === 'girmay' ? 'Girmay Branch' : userBranch}
+              </p>
             </div>
             <Button 
               variant="outline" 

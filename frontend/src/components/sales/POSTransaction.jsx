@@ -21,27 +21,25 @@ const POSTransaction = () => {
   const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [currentBranch, setCurrentBranch] = useState("berhane"); // User's branch
 
   useEffect(() => {
     fetchProducts();
-  }, []);
+  }, [currentBranch]); // Refetch when branch changes
 
   const fetchProducts = async () => {
     try {
       const response = await fetch(`${BACKEND_URL}/api/inventory`);
       if (response.ok) {
         const data = await response.json();
-        // Filter finished products (flour and bran) with package sizes
-        const finishedProducts = data.filter(item => 
-          item.category === "flour" || 
-          item.category === "bran" ||
-          item.name.includes("Quality") || 
-          item.name.includes("Bread") || 
-          item.name.includes("Fruska") || 
-          item.name.includes("Fruskela") ||
-          item.name.includes("Furska")
+        // Filter products for current branch only and exclude service items
+        const branchProducts = data.filter(item => 
+          item.branch_id === currentBranch &&
+          item.is_sellable !== false &&  // Exclude TDF service items
+          item.category !== "service" &&  // Exclude service category
+          (item.category === "flour" || item.category === "bran")
         );
-        setProducts(finishedProducts);
+        setProducts(branchProducts);
       }
     } catch (error) {
       console.error("Error fetching products:", error);
@@ -111,9 +109,11 @@ const POSTransaction = () => {
       const transaction = {
         items: cartItems,
         payment_type: paymentType,
-        sales_person: "Current User", // Replace with actual user
+        sales_person_id: "SALES-001", // Replace with actual user ID
+        sales_person_name: "Sales User", // Replace with actual user name
+        branch_id: currentBranch,
+        customer_id: paymentType === "loan" ? customerPhone : null,
         customer_name: paymentType === "loan" ? customerName : null,
-        customer_phone: paymentType === "loan" ? customerPhone : null,
         notes: notes || null
       };
 
@@ -159,8 +159,22 @@ const POSTransaction = () => {
       {/* Products List */}
       <Card className="lg:col-span-2 border-slate-200 shadow-md">
         <CardHeader>
-          <CardTitle className="text-slate-900">Available Products</CardTitle>
-          <CardDescription>Select products to add to cart</CardDescription>
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <CardTitle className="text-slate-900">Available Products</CardTitle>
+              <CardDescription>Select products to add to cart</CardDescription>
+            </div>
+            {/* Branch Selector */}
+            <Select value={currentBranch} onValueChange={setCurrentBranch}>
+              <SelectTrigger className="w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="berhane">Berhane Branch</SelectItem>
+                <SelectItem value="girmay">Girmay Branch</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           
           {/* Category Filter */}
           <div className="flex gap-2 mt-4">
@@ -188,6 +202,14 @@ const POSTransaction = () => {
             >
               Bran
             </Button>
+          </div>
+
+          {/* Branch Info */}
+          <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded">
+            <p className="text-xs text-blue-900">
+              <span className="font-semibold">Showing products from:</span> {currentBranch === "berhane" ? "Berhane Branch" : "Girmay Branch"} 
+              {" "}({filteredProducts.length} products available)
+            </p>
           </div>
         </CardHeader>
         <CardContent>
