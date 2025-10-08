@@ -155,7 +155,7 @@ export const mockData = {
       branch: "Both Branches",
       date: "2025-01-13",
       time: "11:30",
-      description: "ETB 2,000,000 cash withdrawal without prior owner approval",
+      description: "Br 2,000,000 cash withdrawal without prior owner approval",
       status: "Resolved"
     }
   ],
