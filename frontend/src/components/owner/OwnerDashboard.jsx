@@ -14,7 +14,9 @@ import {
   BarChart3,
   Users,
   ArrowUpRight,
-  ArrowDownRight 
+  ArrowDownRight,
+  FileBarChart,
+  UserCog
 } from "lucide-react";
 import { mockData } from "../../data/mockData";
 
