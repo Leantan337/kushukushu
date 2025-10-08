@@ -20,6 +20,7 @@ import SimplePOS from "./components/demo/SimplePOS";
 import SimpleInventoryDashboard from "./components/demo/SimpleInventoryDashboard";
 import SimpleSalesDashboard from "./components/demo/SimpleSalesDashboard";
 import FinanceDashboard from "./components/demo/FinanceDashboard";
+import DemoLanding from "./components/demo/DemoLanding";
 import { Toaster } from "./components/ui/toaster";
 
 function App() {
