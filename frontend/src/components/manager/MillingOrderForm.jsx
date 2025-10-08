@@ -28,7 +28,7 @@ const MillingOrderForm = ({ manager, onSuccess, onCancel }) => {
 
   const fetchData = async () => {
     try {
-      const backendUrl = import.meta.env.REACT_APP_BACKEND_URL || process.env.REACT_APP_BACKEND_URL;
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
       
       // Fetch inventory to get available products and raw wheat stock
       const inventoryResponse = await fetch(`${backendUrl}/inventory`);
@@ -61,7 +61,7 @@ const MillingOrderForm = ({ manager, onSuccess, onCancel }) => {
     setMessage({ type: '', text: '' });
 
     try {
-      const backendUrl = import.meta.env.REACT_APP_BACKEND_URL || process.env.REACT_APP_BACKEND_URL;
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
       
       const orderData = {
         raw_wheat_input_kg: parseFloat(createFormData.raw_wheat_input_kg),
@@ -119,7 +119,7 @@ const MillingOrderForm = ({ manager, onSuccess, onCancel }) => {
     setMessage({ type: '', text: '' });
 
     try {
-      const backendUrl = import.meta.env.REACT_APP_BACKEND_URL || process.env.REACT_APP_BACKEND_URL;
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
       
       const response = await fetch(`${backendUrl}/milling-orders/${orderId}/complete`, {
         method: 'POST',
