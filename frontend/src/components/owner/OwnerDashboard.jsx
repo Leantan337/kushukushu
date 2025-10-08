@@ -107,6 +107,18 @@ const OwnerDashboard = () => {
                   3
                 </Badge>
               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  localStorage.clear();
+                  sessionStorage.clear();
+                  navigate("/");
+                }}
+                className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-300"
+              >
+                <LogOut className="w-4 h-4" />
+              </Button>
             </div>
           </div>
         </div>
