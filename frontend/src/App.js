@@ -58,9 +58,11 @@ function App() {
           {/* Sales Routes */}
           <Route path="/sales/dashboard" element={<SalesDashboard />} />
           
+          {/* Store Keeper Routes */}
+          <Route path="/storekeeper/dashboard" element={<StoreKeeperDashboard />} />
+          
           {/* Placeholder routes for other roles */}
           <Route path="/finance/dashboard" element={<div className="p-8 text-center"><h1 className="text-2xl font-bold">Finance Dashboard - Coming Soon</h1></div>} />
-          <Route path="/storekeeper/dashboard" element={<div className="p-8 text-center"><h1 className="text-2xl font-bold">Store Keeper Dashboard - Coming Soon</h1></div>} />
         </Routes>
       </BrowserRouter>
       <Toaster />
