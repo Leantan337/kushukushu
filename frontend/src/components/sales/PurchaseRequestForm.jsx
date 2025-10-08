@@ -13,7 +13,12 @@ const PurchaseRequestForm = () => {
     description: "",
     estimated_cost: "",
     reason: "",
-    branch_id: "BR001"
+    branch_id: "sales_branch",
+    purchase_type: "cash",
+    category: "supplies",
+    impacts_inventory: false,
+    vendor_name: "",
+    vendor_contact: ""
   });
   const [loading, setLoading] = useState(false);
 
@@ -58,7 +63,13 @@ const PurchaseRequestForm = () => {
         estimated_cost: parseFloat(formData.estimated_cost),
         reason: formData.reason,
         branch_id: formData.branch_id,
-        requested_by: "Current User" // Replace with actual user
+        requested_by: "Sales User", // Replace with actual user
+        purchase_type: formData.purchase_type,
+        category: formData.category,
+        impacts_inventory: formData.purchase_type === "material",
+        inventory_items: formData.purchase_type === "material" ? [] : undefined,
+        vendor_name: formData.vendor_name || undefined,
+        vendor_contact: formData.vendor_contact || undefined
       };
 
       const response = await fetch(`${BACKEND_URL}/api/purchase-requests`, {
@@ -70,15 +81,20 @@ const PurchaseRequestForm = () => {
       if (response.ok) {
         const data = await response.json();
         toast({
-          title: "Success",
-          description: `Request ${data.requisition_number} submitted successfully`,
+          title: "Request Submitted",
+          description: `Request ${data.request_number} submitted for approval`,
         });
         // Reset form
         setFormData({
           description: "",
           estimated_cost: "",
           reason: "",
-          branch_id: "BR001"
+          branch_id: "sales_branch",
+          purchase_type: "cash",
+          category: "supplies",
+          impacts_inventory: false,
+          vendor_name: "",
+          vendor_contact: ""
         });
       } else {
         const error = await response.json();
@@ -141,46 +157,115 @@ const PurchaseRequestForm = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="description">Item/Service Description *</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => handleChange("description", e.target.value)}
-                  placeholder="Describe what you need to purchase..."
-                  rows={3}
-                  required
-                />
-                <p className="text-xs text-slate-500">Be specific about quantities and specifications</p>
+                <Label htmlFor="purchase_type">Purchase Type *</Label>
+                <Select 
+                  value={formData.purchase_type} 
+                  onValueChange={(value) => handleChange("purchase_type", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="material">Material (adds to inventory)</SelectItem>
+                    <SelectItem value="cash">Cash Purchase</SelectItem>
+                    <SelectItem value="service">Service/Contract</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="estimated_cost">Estimated Cost (ETB) *</Label>
+                <Label htmlFor="category">Category *</Label>
+                <Select 
+                  value={formData.category} 
+                  onValueChange={(value) => handleChange("category", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="raw_material">Raw Material (Wheat, etc)</SelectItem>
+                    <SelectItem value="packaging">Packaging Materials</SelectItem>
+                    <SelectItem value="equipment">Equipment/Machinery</SelectItem>
+                    <SelectItem value="supplies">Supplies (Office, Cleaning)</SelectItem>
+                    <SelectItem value="service">Service</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {formData.purchase_type === "material" && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+                <p className="text-sm text-blue-900 font-medium">
+                  📦 Material Purchase - Will update inventory when received
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Item/Service Description *</Label>
+              <Textarea
+                id="description"
+                value={formData.description}
+                onChange={(e) => handleChange("description", e.target.value)}
+                placeholder="Describe what you need to purchase..."
+                rows={3}
+                required
+              />
+              <p className="text-xs text-slate-500">Be specific about quantities and specifications</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="vendor_name">Vendor Name</Label>
                 <Input
-                  id="estimated_cost"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.estimated_cost}
-                  onChange={(e) => handleChange("estimated_cost", e.target.value)}
-                  placeholder="0.00"
-                  required
+                  id="vendor_name"
+                  value={formData.vendor_name}
+                  onChange={(e) => handleChange("vendor_name", e.target.value)}
+                  placeholder="Supplier or vendor name"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="reason">Reason & Justification *</Label>
-                <Textarea
-                  id="reason"
-                  value={formData.reason}
-                  onChange={(e) => handleChange("reason", e.target.value)}
-                  placeholder="Explain why this purchase is necessary..."
-                  rows={4}
-                  required
+                <Label htmlFor="vendor_contact">Vendor Contact</Label>
+                <Input
+                  id="vendor_contact"
+                  value={formData.vendor_contact}
+                  onChange={(e) => handleChange("vendor_contact", e.target.value)}
+                  placeholder="Phone or email"
                 />
-                <p className="text-xs text-slate-500">This will go through Manager → Admin → Owner approval</p>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="estimated_cost">Estimated Cost (ETB) *</Label>
+              <Input
+                id="estimated_cost"
+                type="number"
+                min="0"
+                step="0.01"
+                value={formData.estimated_cost}
+                onChange={(e) => handleChange("estimated_cost", e.target.value)}
+                placeholder="0.00"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="reason">Reason & Justification *</Label>
+              <Textarea
+                id="reason"
+                value={formData.reason}
+                onChange={(e) => handleChange("reason", e.target.value)}
+                placeholder="Explain why this purchase is necessary..."
+                rows={4}
+                required
+              />
+              <p className="text-xs text-slate-500">This will go through Manager → Admin → Owner approval</p>
+            </div>
 
               {formData.estimated_cost && (
                 <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
@@ -202,7 +287,12 @@ const PurchaseRequestForm = () => {
                     description: "",
                     estimated_cost: "",
                     reason: "",
-                    branch_id: "BR001"
+                    branch_id: "sales_branch",
+                    purchase_type: "cash",
+                    category: "supplies",
+                    impacts_inventory: false,
+                    vendor_name: "",
+                    vendor_contact: ""
                   })}
                 >
                   Reset

@@ -20,6 +20,8 @@ const POSTransaction = () => {
 
   const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 
+  const [selectedCategory, setSelectedCategory] = useState("all");
+
   useEffect(() => {
     fetchProducts();
   }, []);
@@ -29,16 +31,26 @@ const POSTransaction = () => {
       const response = await fetch(`${BACKEND_URL}/api/inventory`);
       if (response.ok) {
         const data = await response.json();
-        // Filter only finished flour products
-        const flourProducts = data.filter(item => 
-          item.name.includes("Flour") || item.name.includes("Fruska") || item.name.includes("Fruskelo")
+        // Filter finished products (flour and bran) with package sizes
+        const finishedProducts = data.filter(item => 
+          item.category === "flour" || 
+          item.category === "bran" ||
+          item.name.includes("Quality") || 
+          item.name.includes("Bread") || 
+          item.name.includes("Fruska") || 
+          item.name.includes("Fruskela") ||
+          item.name.includes("Furska")
         );
-        setProducts(flourProducts);
+        setProducts(finishedProducts);
       }
     } catch (error) {
       console.error("Error fetching products:", error);
     }
   };
+
+  const filteredProducts = selectedCategory === "all" 
+    ? products 
+    : products.filter(p => p.category === selectedCategory);
 
   const addToCart = (product) => {
     const existingItem = cartItems.find(item => item.product_id === product.id);
@@ -149,30 +161,80 @@ const POSTransaction = () => {
         <CardHeader>
           <CardTitle className="text-slate-900">Available Products</CardTitle>
           <CardDescription>Select products to add to cart</CardDescription>
+          
+          {/* Category Filter */}
+          <div className="flex gap-2 mt-4">
+            <Button
+              onClick={() => setSelectedCategory("all")}
+              variant={selectedCategory === "all" ? "default" : "outline"}
+              size="sm"
+              className={selectedCategory === "all" ? "bg-blue-500" : ""}
+            >
+              All Products
+            </Button>
+            <Button
+              onClick={() => setSelectedCategory("flour")}
+              variant={selectedCategory === "flour" ? "default" : "outline"}
+              size="sm"
+              className={selectedCategory === "flour" ? "bg-blue-500" : ""}
+            >
+              Flour
+            </Button>
+            <Button
+              onClick={() => setSelectedCategory("bran")}
+              variant={selectedCategory === "bran" ? "default" : "outline"}
+              size="sm"
+              className={selectedCategory === "bran" ? "bg-blue-500" : ""}
+            >
+              Bran
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {products.map((product) => (
+            {filteredProducts.map((product) => (
               <div
                 key={product.id}
-                className="border border-slate-200 rounded-lg p-4 hover:border-blue-400 transition-colors"
+                className="border border-slate-200 rounded-lg p-4 hover:border-blue-400 transition-colors hover:shadow-md"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-semibold text-slate-900">{product.name}</h3>
+                  <div>
+                    <h3 className="font-semibold text-slate-900">{product.name}</h3>
+                    {product.package_size && product.package_size !== "bulk" && (
+                      <span className="text-xs text-slate-500">
+                        Package: {product.package_size}
+                      </span>
+                    )}
+                  </div>
                   <span className={`text-xs px-2 py-1 rounded ${
                     product.stock_level === "ok" ? "bg-green-100 text-green-700" :
                     product.stock_level === "low" ? "bg-yellow-100 text-yellow-700" :
                     "bg-red-100 text-red-700"
                   }`}>
-                    {product.current_stock} {product.unit}
+                    {product.quantity || product.current_stock} {product.unit}
                   </span>
                 </div>
+                {product.packages_available > 0 && (
+                  <div className="text-xs text-slate-600 mb-2">
+                    {product.packages_available} packages available
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
-                  <span className="text-lg font-bold text-blue-600">ETB {product.unit_price || 50}/{product.unit}</span>
+                  <div>
+                    <span className="text-lg font-bold text-blue-600">
+                      ETB {product.unit_price?.toLocaleString() || 50}
+                    </span>
+                    {product.package_size && product.package_size !== "bulk" ? (
+                      <span className="text-xs text-slate-500 ml-1">/{product.package_size}</span>
+                    ) : (
+                      <span className="text-xs text-slate-500 ml-1">/{product.unit}</span>
+                    )}
+                  </div>
                   <Button
                     onClick={() => addToCart(product)}
                     size="sm"
                     className="bg-blue-500 hover:bg-blue-600"
+                    disabled={product.quantity <= 0 || product.stock_level === "critical"}
                   >
                     <Plus className="w-4 h-4 mr-1" />
                     Add

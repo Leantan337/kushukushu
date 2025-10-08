@@ -11,28 +11,34 @@ import { useToast } from "../../hooks/use-toast";
 const InventoryRequestForm = () => {
   const { toast } = useToast();
   const [formData, setFormData] = useState({
-    product_name: "1st Quality Flour",
-    package_size: "50",
+    product_name: "1st Quality 50kg",
+    package_size: "50kg",
     num_packages: "",
     reason: "",
-    branch_id: "BR001"
+    branch_id: "sales_branch" // Replace with actual branch
   });
   const [loading, setLoading] = useState(false);
 
   const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 
   const packageSizes = [
-    { value: "50", label: "50 kg" },
-    { value: "25", label: "25 kg" },
-    { value: "10", label: "10 kg" },
-    { value: "5", label: "5 kg" }
+    { value: "50kg", label: "50 kg" },
+    { value: "25kg", label: "25 kg" },
+    { value: "15kg", label: "15 kg" },
+    { value: "10kg", label: "10 kg" },
+    { value: "5kg", label: "5 kg" }
   ];
 
   const products = [
-    { value: "1st Quality Flour", label: "1st Quality Flour" },
-    { value: "Bread Flour", label: "Bread Flour" },
-    { value: "Fruska", label: "Fruska" },
-    { value: "Fruskelo", label: "Fruskelo" }
+    { value: "1st Quality 50kg", label: "1st Quality Flour 50kg" },
+    { value: "1st Quality 25kg", label: "1st Quality Flour 25kg" },
+    { value: "1st Quality 15kg", label: "1st Quality Flour 15kg" },
+    { value: "1st Quality 5kg", label: "1st Quality Flour 5kg" },
+    { value: "Bread Flour 50kg", label: "Bread Flour 50kg" },
+    { value: "Bread Flour 25kg", label: "Bread Flour 25kg" },
+    { value: "White Fruskela", label: "White Fruskela (Bran)" },
+    { value: "Red Fruskela", label: "Red Fruskela (Bran)" },
+    { value: "Furska", label: "Furska (Bran)" }
   ];
 
   const handleChange = (field, value) => {
@@ -59,14 +65,14 @@ const InventoryRequestForm = () => {
     try {
       const request = {
         product_name: formData.product_name,
-        package_size: parseInt(formData.package_size),
-        num_packages: parseInt(formData.num_packages),
-        reason: formData.reason,
+        package_size: formData.package_size,
+        quantity: parseInt(formData.num_packages),
+        requested_by: "Sales User", // Replace with actual user
         branch_id: formData.branch_id,
-        requested_by: "Current User" // Replace with actual user
+        reason: formData.reason
       };
 
-      const response = await fetch(`${BACKEND_URL}/api/inventory-requests`, {
+      const response = await fetch(`${BACKEND_URL}/api/stock-requests`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(request)
@@ -75,16 +81,16 @@ const InventoryRequestForm = () => {
       if (response.ok) {
         const data = await response.json();
         toast({
-          title: "Success",
-          description: `Request ${data.request_number} submitted successfully`,
+          title: "Request Submitted",
+          description: `Request ${data.request_number} submitted for approval`,
         });
         // Reset form
         setFormData({
-          product_name: "1st Quality Flour",
-          package_size: "50",
+          product_name: "1st Quality 50kg",
+          package_size: "50kg",
           num_packages: "",
           reason: "",
-          branch_id: "BR001"
+          branch_id: "sales_branch"
         });
       } else {
         const error = await response.json();

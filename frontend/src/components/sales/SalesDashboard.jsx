@@ -11,12 +11,18 @@ import {
   LogOut,
   DollarSign,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  ClipboardList,
+  CreditCard,
+  Truck
 } from "lucide-react";
 import POSTransaction from "./POSTransaction";
 import InventoryRequestForm from "./InventoryRequestForm";
 import PurchaseRequestForm from "./PurchaseRequestForm";
 import SalesReports from "./SalesReports";
+import OrderManagement from "./OrderManagement";
+import LoanManagement from "./LoanManagement";
+import PendingDeliveries from "./PendingDeliveries";
 
 const SalesDashboard = () => {
   const navigate = useNavigate();
@@ -44,6 +50,27 @@ const SalesDashboard = () => {
       description: "Process customer transaction"
     },
     { 
+      icon: ClipboardList, 
+      label: "Orders", 
+      color: "bg-indigo-500", 
+      tab: "orders",
+      description: "Track all orders"
+    },
+    { 
+      icon: CreditCard, 
+      label: "Loans", 
+      color: "bg-rose-500", 
+      tab: "loans",
+      description: "Manage customer loans"
+    },
+    { 
+      icon: Truck, 
+      label: "Deliveries", 
+      color: "bg-teal-500", 
+      tab: "deliveries",
+      description: "Pending stock deliveries"
+    },
+    { 
       icon: Package, 
       label: "Request Stock", 
       color: "bg-green-500", 
@@ -66,23 +93,32 @@ const SalesDashboard = () => {
     }
   ];
 
-  const recentActivity = [
-    { 
-      action: "Completed sale TXN-000045",
-      time: "5 minutes ago",
-      type: "success"
-    },
-    { 
-      action: "Stock request REQ-000012 approved",
-      time: "1 hour ago",
-      type: "success"
-    },
-    { 
-      action: "Low stock alert: Bread Flour",
-      time: "2 hours ago",
-      type: "warning"
+  const [recentActivity, setRecentActivity] = useState([]);
+  const [loadingActivity, setLoadingActivity] = useState(false);
+
+  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+
+  useEffect(() => {
+    fetchRecentActivity();
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(fetchRecentActivity, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const fetchRecentActivity = async () => {
+    setLoadingActivity(true);
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/recent-activity?limit=10`);
+      if (response.ok) {
+        const data = await response.json();
+        setRecentActivity(data);
+      }
+    } catch (error) {
+      console.error("Error fetching recent activity:", error);
+    } finally {
+      setLoadingActivity(false);
     }
-  ];
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 p-6">
@@ -109,20 +145,29 @@ const SalesDashboard = () => {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="bg-white border border-slate-200 p-1 rounded-lg shadow-sm">
-            <TabsTrigger value="overview" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white">
+          <TabsList className="bg-white border border-slate-200 p-1 rounded-lg shadow-sm grid grid-cols-4 lg:grid-cols-8 gap-1">
+            <TabsTrigger value="overview" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white text-xs lg:text-sm">
               Overview
             </TabsTrigger>
-            <TabsTrigger value="pos" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white">
-              Point of Sale
+            <TabsTrigger value="pos" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white text-xs lg:text-sm">
+              POS
             </TabsTrigger>
-            <TabsTrigger value="inventory" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white">
-              Stock Requests
+            <TabsTrigger value="orders" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white text-xs lg:text-sm">
+              Orders
             </TabsTrigger>
-            <TabsTrigger value="purchase" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white">
-              Purchase Requests
+            <TabsTrigger value="loans" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white text-xs lg:text-sm">
+              Loans
             </TabsTrigger>
-            <TabsTrigger value="reports" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white">
+            <TabsTrigger value="deliveries" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white text-xs lg:text-sm">
+              Deliveries
+            </TabsTrigger>
+            <TabsTrigger value="inventory" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white text-xs lg:text-sm">
+              Stock
+            </TabsTrigger>
+            <TabsTrigger value="purchase" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white text-xs lg:text-sm">
+              Purchase
+            </TabsTrigger>
+            <TabsTrigger value="reports" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white text-xs lg:text-sm">
               Reports
             </TabsTrigger>
           </TabsList>
@@ -191,7 +236,7 @@ const SalesDashboard = () => {
                 <CardDescription>Fast access to common tasks</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
                   {quickActions.map((action, index) => (
                     <Button
                       key={index}
@@ -212,25 +257,40 @@ const SalesDashboard = () => {
             {/* Recent Activity */}
             <Card className="border-slate-200 shadow-md">
               <CardHeader>
-                <CardTitle className="text-slate-900">Recent Activity</CardTitle>
-                <CardDescription>Latest updates from your sales point</CardDescription>
+                <CardTitle className="text-slate-900 flex items-center justify-between">
+                  Recent Activity
+                  {loadingActivity && (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  )}
+                </CardTitle>
+                <CardDescription>Latest updates from your sales point (auto-refreshes)</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {recentActivity.map((activity, index) => (
-                    <div key={index} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
-                      {activity.type === "success" ? (
-                        <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
-                      ) : (
-                        <AlertCircle className="w-5 h-5 text-orange-500 mt-0.5" />
-                      )}
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-slate-900">{activity.action}</p>
-                        <p className="text-xs text-slate-500 mt-1">{activity.time}</p>
+                {recentActivity.length === 0 && !loadingActivity ? (
+                  <div className="text-center py-8">
+                    <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-2" />
+                    <p className="text-slate-500">No recent activity</p>
+                    <p className="text-xs text-slate-400 mt-1">Activity will appear here as you work</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {recentActivity.map((activity, index) => (
+                      <div key={index} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
+                        {activity.type === "success" ? (
+                          <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
+                        ) : activity.type === "warning" ? (
+                          <AlertCircle className="w-5 h-5 text-orange-500 mt-0.5" />
+                        ) : (
+                          <AlertCircle className="w-5 h-5 text-blue-500 mt-0.5" />
+                        )}
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-slate-900">{activity.action}</p>
+                          <p className="text-xs text-slate-500 mt-1">{activity.time}</p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -240,7 +300,22 @@ const SalesDashboard = () => {
             <POSTransaction />
           </TabsContent>
 
-          {/* Inventory Request Tab */}
+          {/* Order Management Tab */}
+          <TabsContent value="orders">
+            <OrderManagement />
+          </TabsContent>
+
+          {/* Loan Management Tab */}
+          <TabsContent value="loans">
+            <LoanManagement />
+          </TabsContent>
+
+          {/* Pending Deliveries Tab */}
+          <TabsContent value="deliveries">
+            <PendingDeliveries />
+          </TabsContent>
+
+          {/* Stock Request Tab */}
           <TabsContent value="inventory">
             <InventoryRequestForm />
           </TabsContent>

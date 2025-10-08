@@ -39,12 +39,33 @@ class PurchaseRequisitionStatus(str, Enum):
     ADMIN_APPROVED = "admin_approved"
     OWNER_APPROVED = "owner_approved"
     PURCHASED = "purchased"
+    RECEIVED = "received"  # Material received and added to inventory
     REJECTED = "rejected"
 
+class PurchaseType(str, Enum):
+    MATERIAL = "material"  # Physical goods that go to inventory
+    CASH = "cash"  # Cash purchases, services
+    SERVICE = "service"  # Services, contracts
+
+class PurchaseCategory(str, Enum):
+    RAW_MATERIAL = "raw_material"  # Wheat, supplies
+    PACKAGING = "packaging"  # Bags, labels
+    EQUIPMENT = "equipment"  # Machinery, tools
+    SUPPLIES = "supplies"  # Office, cleaning
+    SERVICE = "service"  # Maintenance, consulting
+    OTHER = "other"
+
 class InternalOrderStatus(str, Enum):
-    PENDING_APPROVAL = "pending_approval"
-    APPROVED = "approved"
-    FULFILLED = "fulfilled"
+    PENDING_ADMIN_APPROVAL = "pending_admin_approval"
+    ADMIN_APPROVED = "admin_approved"
+    PENDING_MANAGER_APPROVAL = "pending_manager_approval"
+    MANAGER_APPROVED = "manager_approved"
+    PENDING_FULFILLMENT = "pending_fulfillment"
+    READY_FOR_PICKUP = "ready_for_pickup"
+    AT_GATE = "at_gate"
+    IN_TRANSIT = "in_transit"
+    DELIVERED = "delivered"
+    CONFIRMED = "confirmed"
     REJECTED = "rejected"
 
 class StockAdjustmentStatus(str, Enum):
@@ -84,6 +105,18 @@ class UserRole(str, Enum):
     ADMIN = "admin"
     OWNER = "owner"
     STORE_KEEPER = "store_keeper"
+
+class LoanStatus(str, Enum):
+    ACTIVE = "active"
+    PAID = "paid"
+    OVERDUE = "overdue"
+    WRITTEN_OFF = "written_off"
+
+class PaymentHistoryRating(str, Enum):
+    EXCELLENT = "excellent"
+    GOOD = "good"
+    FAIR = "fair"
+    POOR = "poor"
 
 
 # Define Models
@@ -175,23 +208,58 @@ class PurchaseRequisition(BaseModel):
     request_number: str
     description: str
     estimated_cost: float
+    actual_cost: Optional[float] = None
     reason: str
     requested_by: str
+    branch_id: str
     requested_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    
+    # NEW: Categorization
+    purchase_type: PurchaseType = PurchaseType.CASH
+    category: PurchaseCategory = PurchaseCategory.OTHER
+    impacts_inventory: bool = False
+    inventory_items: List[Dict] = []  # [{item_name, quantity, unit}]
+    
+    # NEW: Vendor Information
+    vendor_name: Optional[str] = None
+    vendor_contact: Optional[str] = None
+    vendor_quotation: Optional[str] = None
+    
+    # Approval Chain
     status: PurchaseRequisitionStatus = PurchaseRequisitionStatus.PENDING
     manager_approval: Optional[ApprovalRecord] = None
     admin_approval: Optional[ApprovalRecord] = None
     owner_approval: Optional[ApprovalRecord] = None
+    
+    # Purchase & Receipt
+    purchased_at: Optional[datetime] = None
+    purchased_by: Optional[str] = None
+    receipt_number: Optional[str] = None
+    receipt_date: Optional[datetime] = None
+    payment_method: Optional[str] = None
+    
+    # Material Receipt (if impacts inventory)
+    received_at: Optional[datetime] = None
+    received_by: Optional[str] = None
+    inventory_updated: bool = False
+    
+    # Rejection
     rejection_reason: Optional[str] = None
     rejected_by: Optional[str] = None
     rejected_at: Optional[datetime] = None
-    purchased_at: Optional[datetime] = None
 
 class PurchaseRequisitionCreate(BaseModel):
     description: str
     estimated_cost: float
     reason: str
     requested_by: str
+    branch_id: str
+    purchase_type: PurchaseType = PurchaseType.CASH
+    category: PurchaseCategory = PurchaseCategory.OTHER
+    impacts_inventory: bool = False
+    inventory_items: List[Dict] = []
+    vendor_name: Optional[str] = None
+    vendor_contact: Optional[str] = None
 
 class PurchaseRequisitionApproval(BaseModel):
     approved_by: str
@@ -201,8 +269,30 @@ class PurchaseRequisitionRejection(BaseModel):
     rejected_by: str
     reason: str
 
+class PurchaseCompletion(BaseModel):
+    purchased_by: str
+    actual_cost: float
+    receipt_number: Optional[str] = None
+    receipt_date: Optional[str] = None
+    payment_method: str  # cash, check, transfer
+    notes: Optional[str] = None
+
+class MaterialReceipt(BaseModel):
+    received_by: str
+    received_quantity: Dict  # {item_name: quantity}
+    condition: str  # good, damaged, partial
+    notes: Optional[str] = None
+
 
 # Internal Order Requisition Models
+class WorkflowStage(BaseModel):
+    stage: str
+    status: str
+    assigned_to: Optional[str] = None
+    completed_by: Optional[str] = None
+    completed_at: Optional[datetime] = None
+    notes: Optional[str] = None
+
 class InternalOrderRequisition(BaseModel):
     model_config = ConfigDict(extra="ignore")
     
@@ -213,35 +303,71 @@ class InternalOrderRequisition(BaseModel):
     quantity: int  # number of packages
     total_weight: float  # total kg = quantity * package_size
     requested_by: str
+    branch_id: str  # Sales branch requesting
+    source_branch: str  # Warehouse branch where product is located
     requested_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    status: InternalOrderStatus = InternalOrderStatus.PENDING_APPROVAL
-    manager_approval_status: ManagerApprovalStatus = ManagerApprovalStatus.PENDING
-    approved_by: Optional[str] = None
-    approved_at: Optional[datetime] = None
-    fulfilled_by: Optional[str] = None
-    fulfilled_at: Optional[datetime] = None
+    status: InternalOrderStatus = InternalOrderStatus.PENDING_ADMIN_APPROVAL
+    
+    # Inventory tracking
+    inventory_reserved: bool = False
+    inventory_deducted: bool = False
+    delivery_confirmed: bool = False
+    
+    # Workflow stages
+    admin_approval: Optional[ApprovalRecord] = None
+    manager_approval: Optional[ApprovalRecord] = None
+    fulfillment: Optional[Dict] = None  # fulfilled_by, fulfilled_at, packing_slip, etc.
+    gate_verification: Optional[Dict] = None  # verified_by, gate_pass, vehicle, etc.
+    delivery_confirmation: Optional[Dict] = None  # confirmed_by, received_at, condition, etc.
+    
+    # Rejection
     rejection_reason: Optional[str] = None
     rejected_by: Optional[str] = None
     rejected_at: Optional[datetime] = None
+    rejected_at_stage: Optional[str] = None
+    
+    # Workflow history
+    workflow_history: List[Dict] = []
 
 class InternalOrderCreate(BaseModel):
     product_name: str
     package_size: str
     quantity: int
     requested_by: str
+    branch_id: str
+    reason: Optional[str] = None
 
-class InternalOrderApproval(BaseModel):
+class AdminApprovalAction(BaseModel):
     approved_by: str
+    notes: Optional[str] = None
+
+class ManagerApprovalAction(BaseModel):
+    approved_by: str
+    notes: Optional[str] = None
 
 class InternalOrderRejection(BaseModel):
     rejected_by: str
     reason: str
+    stage: str
 
-class InternalOrderFulfillment(BaseModel):
+class FulfillmentAction(BaseModel):
     fulfilled_by: str
+    packing_slip_number: Optional[str] = None
+    actual_quantity: Optional[int] = None
+    notes: Optional[str] = None
 
-class ManagerApproval(BaseModel):
-    approved_by: str
+class GateVerificationAction(BaseModel):
+    verified_by: str
+    gate_pass_number: str
+    vehicle_number: Optional[str] = None
+    driver_name: Optional[str] = None
+    notes: Optional[str] = None
+
+class DeliveryConfirmationAction(BaseModel):
+    confirmed_by: str
+    received_quantity: int
+    condition: str  # "good", "damaged", "partial"
+    notes: Optional[str] = None
 
 
 # Manager Role Models
@@ -350,6 +476,96 @@ class SalesReportQuery(BaseModel):
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     sales_person_id: Optional[str] = None
+
+
+# Customer & Loan Models
+class LoanPayment(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    payment_number: str
+    amount: float
+    payment_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    payment_method: str  # cash, check, transfer
+    received_by: str
+    receipt_number: Optional[str] = None
+    notes: Optional[str] = None
+
+class Loan(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    loan_number: str
+    customer_id: str
+    sales_transaction_id: str
+    transaction_number: str
+    principal_amount: float
+    amount_paid: float = 0.0
+    balance: float
+    issue_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    due_date: datetime
+    status: LoanStatus = LoanStatus.ACTIVE
+    interest_rate: float = 0.0  # percentage
+    days_overdue: int = 0
+    payments: List[Dict] = []  # Payment history
+    branch_id: str
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class Customer(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    customer_number: str
+    name: str
+    phone: str
+    email: Optional[str] = None
+    address: Optional[str] = None
+    branch_id: str
+    
+    # Credit Management
+    credit_limit: float = 100000.0
+    credit_used: float = 0.0
+    credit_available: float = 100000.0
+    
+    # Payment Tracking
+    payment_history_rating: PaymentHistoryRating = PaymentHistoryRating.GOOD
+    total_credit_used: float = 0.0
+    total_paid: float = 0.0
+    outstanding_balance: float = 0.0
+    
+    # Metadata
+    registration_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    registered_by: str
+    status: str = "active"  # active, suspended, blocked
+    notes: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class CustomerCreate(BaseModel):
+    name: str
+    phone: str
+    email: Optional[str] = None
+    address: Optional[str] = None
+    branch_id: str
+    credit_limit: float = 100000.0
+    registered_by: str
+    notes: Optional[str] = None
+
+class LoanCreate(BaseModel):
+    customer_id: str
+    sales_transaction_id: str
+    principal_amount: float
+    due_date: datetime
+    interest_rate: float = 0.0
+    branch_id: str
+    created_by: str
+
+class LoanPaymentCreate(BaseModel):
+    amount: float
+    payment_method: str
+    received_by: str
+    receipt_number: Optional[str] = None
+    notes: Optional[str] = None
 
 
 # Helper function to serialize datetime fields
@@ -820,9 +1036,9 @@ async def approve_purchase_requisition_owner(req_id: str, approval: PurchaseRequ
     deserialize_datetime(updated_req)
     return updated_req
 
-@api_router.put("/purchase-requisitions/{req_id}/mark-purchased", response_model=PurchaseRequisition)
-async def mark_purchase_requisition_purchased(req_id: str, user: str):
-    """Mark purchase requisition as purchased"""
+@api_router.put("/purchase-requisitions/{req_id}/complete-purchase")
+async def complete_purchase(req_id: str, completion: PurchaseCompletion):
+    """Complete purchase with receipt details and create finance transaction"""
     req = await db.purchase_requisitions.find_one({"id": req_id}, {"_id": 0})
     if not req:
         raise HTTPException(status_code=404, detail="Purchase requisition not found")
@@ -832,20 +1048,133 @@ async def mark_purchase_requisition_purchased(req_id: str, user: str):
     
     update_data = {
         "status": PurchaseRequisitionStatus.PURCHASED,
-        "purchased_at": datetime.now(timezone.utc).isoformat()
+        "purchased_at": datetime.now(timezone.utc).isoformat(),
+        "purchased_by": completion.purchased_by,
+        "actual_cost": completion.actual_cost,
+        "receipt_number": completion.receipt_number,
+        "receipt_date": completion.receipt_date,
+        "payment_method": completion.payment_method
     }
     
     await db.purchase_requisitions.update_one({"id": req_id}, {"$set": update_data})
     
+    # Create Finance Transaction for expense
+    finance_txn_count = await db.finance_transactions.count_documents({})
+    finance_txn_number = f"FIN-{finance_txn_count + 1:06d}"
+    
+    finance_transaction = {
+        "id": str(uuid.uuid4()),
+        "transaction_number": finance_txn_number,
+        "type": "expense",
+        "source_type": "purchase",
+        "source_id": req_id,
+        "source_reference": req["request_number"],
+        "amount": completion.actual_cost,
+        "payment_method": completion.payment_method,
+        "account_type": "cash" if completion.payment_method == "cash" else "bank",
+        "branch_id": req.get("branch_id", "main"),
+        "description": f"Purchase: {req['description']}",
+        "processed_by": completion.purchased_by,
+        "reconciled": False,
+        "vendor_name": req.get("vendor_name"),
+        "receipt_number": completion.receipt_number,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.finance_transactions.insert_one(finance_transaction)
+    
     # Create audit log
-    audit_log = AuditLog(
-        user=user,
-        action="mark_purchase_requisition_purchased",
+    await log_audit(
+        user=completion.purchased_by,
+        action="complete_purchase",
         entity_type="purchase_requisition",
         entity_id=req_id,
-        details={}
+        details={
+            "actual_cost": completion.actual_cost,
+            "payment_method": completion.payment_method,
+            "receipt_number": completion.receipt_number
+        }
     )
-    await db.audit_logs.insert_one(serialize_datetime(audit_log.model_dump()))
+    
+    updated_req = await db.purchase_requisitions.find_one({"id": req_id}, {"_id": 0})
+    deserialize_datetime(updated_req)
+    return updated_req
+
+
+@api_router.put("/purchase-requisitions/{req_id}/receive-material")
+async def receive_material(req_id: str, receipt: MaterialReceipt):
+    """Receive material and update inventory (for material purchases)"""
+    req = await db.purchase_requisitions.find_one({"id": req_id}, {"_id": 0})
+    if not req:
+        raise HTTPException(status_code=404, detail="Purchase requisition not found")
+    
+    if req["status"] != PurchaseRequisitionStatus.PURCHASED:
+        raise HTTPException(status_code=400, detail="Purchase must be completed first")
+    
+    if not req.get("impacts_inventory", False):
+        raise HTTPException(status_code=400, detail="This purchase does not impact inventory")
+    
+    # Update inventory for each item
+    for item_name, quantity in receipt.received_quantity.items():
+        # Find inventory item
+        inventory_item = await db.inventory.find_one({"name": item_name}, {"_id": 0})
+        
+        if inventory_item:
+            # Update existing inventory
+            await add_inventory_transaction(
+                inventory_item["id"],
+                "in",
+                float(quantity),
+                f"Purchase {req['request_number']} - {req.get('vendor_name', 'Vendor')}",
+                receipt.received_by
+            )
+        else:
+            # Create new inventory item if doesn't exist
+            new_inventory = {
+                "id": str(uuid.uuid4()),
+                "name": item_name,
+                "quantity": float(quantity),
+                "unit": "kg",
+                "stock_level": "ok",
+                "low_threshold": 1000.0,
+                "critical_threshold": 500.0,
+                "category": req.get("category", "other"),
+                "branch_id": req.get("branch_id", "main"),
+                "transactions": [{
+                    "id": str(uuid.uuid4()),
+                    "date": datetime.now(timezone.utc).isoformat(),
+                    "type": "in",
+                    "quantity": float(quantity),
+                    "reference": f"Purchase {req['request_number']}",
+                    "performed_by": receipt.received_by
+                }],
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+            await db.inventory.insert_one(new_inventory)
+    
+    # Update purchase requisition
+    update_data = {
+        "status": PurchaseRequisitionStatus.RECEIVED,
+        "received_at": datetime.now(timezone.utc).isoformat(),
+        "received_by": receipt.received_by,
+        "inventory_updated": True
+    }
+    
+    await db.purchase_requisitions.update_one({"id": req_id}, {"$set": update_data})
+    
+    # Log audit
+    await log_audit(
+        user=receipt.received_by,
+        action="receive_material",
+        entity_type="purchase_requisition",
+        entity_id=req_id,
+        details={
+            "condition": receipt.condition,
+            "items_received": receipt.received_quantity
+        }
+    )
     
     updated_req = await db.purchase_requisitions.find_one({"id": req_id}, {"_id": 0})
     deserialize_datetime(updated_req)
@@ -1298,18 +1627,21 @@ async def create_sales_transaction(transaction: SalesTransactionCreate):
             raise HTTPException(status_code=404, detail=f"Product {item_data['product_id']} not found")
         
         # Check sufficient stock
-        if product["quantity"] < item_data["quantity_kg"]:
+        quantity_requested = item_data.get("quantity_kg", item_data.get("quantity", 0))
+        product_qty = product.get("quantity", 0)
+        
+        if product_qty < quantity_requested:
             raise HTTPException(
                 status_code=400, 
-                detail=f"Insufficient stock for {product['name']}. Available: {product['quantity']}kg, Requested: {item_data['quantity_kg']}kg"
+                detail=f"Insufficient stock for {product['name']}. Available: {product_qty}kg, Requested: {quantity_requested}kg"
             )
         
         # Create transaction item
-        item_total = item_data["quantity_kg"] * item_data["unit_price"]
+        item_total = quantity_requested * item_data["unit_price"]
         transaction_item = SalesTransactionItem(
             product_id=item_data["product_id"],
             product_name=item_data["product_name"],
-            quantity_kg=item_data["quantity_kg"],
+            quantity_kg=quantity_requested,
             unit_price=item_data["unit_price"],
             total_price=item_total
         )
@@ -1342,6 +1674,33 @@ async def create_sales_transaction(transaction: SalesTransactionCreate):
     sales_dict = sales_transaction.model_dump()
     serialize_datetime(sales_dict)
     result = await db.sales_transactions.insert_one(sales_dict)
+    
+    # Create Finance Transaction Record
+    finance_txn_count = await db.finance_transactions.count_documents({})
+    finance_txn_number = f"FIN-{finance_txn_count + 1:06d}"
+    
+    finance_transaction = {
+        "id": str(uuid.uuid4()),
+        "transaction_number": finance_txn_number,
+        "type": "income",
+        "source_type": "sales",
+        "source_id": sales_transaction.id,
+        "source_reference": transaction_number,
+        "amount": total_amount,
+        "payment_method": transaction.payment_type.value,
+        "account_type": "cash" if transaction.payment_type == PaymentType.CASH else 
+                       "bank" if transaction.payment_type in [PaymentType.CHECK, PaymentType.TRANSFER] else
+                       "loan",
+        "branch_id": transaction.branch_id,
+        "description": f"Sales payment - {transaction_number}",
+        "processed_by": transaction.sales_person_name,
+        "reconciled": False,
+        "reconciliation_date": None,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.finance_transactions.insert_one(finance_transaction)
     
     # Deduct inventory for each item
     for item_data in transaction.items:
@@ -1411,62 +1770,559 @@ async def create_sales_transaction(transaction: SalesTransactionCreate):
         }
     )
     
+    # If payment is loan, automatically create loan record
+    if transaction.payment_type == PaymentType.LOAN:
+        # Check if customer exists, if not create one
+        customer = await db.customers.find_one({"phone": transaction.customer_id}, {"_id": 0})
+        
+        if not customer:
+            # Create new customer
+            customer_count = await db.customers.count_documents({})
+            customer_number = f"CUST-{customer_count + 1:05d}"
+            
+            customer = {
+                "id": str(uuid.uuid4()),
+                "customer_number": customer_number,
+                "name": transaction.customer_name,
+                "phone": transaction.customer_id,  # Using phone as customer_id
+                "branch_id": transaction.branch_id,
+                "credit_limit": 500000.0,  # Default credit limit
+                "credit_used": total_amount,
+                "credit_available": 500000.0 - total_amount,
+                "outstanding_balance": total_amount,
+                "payment_history_rating": "good",
+                "total_credit_used": total_amount,
+                "total_paid": 0.0,
+                "registration_date": datetime.now(timezone.utc).isoformat(),
+                "registered_by": transaction.sales_person_name,
+                "status": "active",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+            
+            await db.customers.insert_one(customer)
+        
+        # Create loan
+        loan_count = await db.loans.count_documents({})
+        loan_number = f"LOAN-{loan_count + 1:06d}"
+        
+        # Due date: 30 days from now (configurable)
+        due_date = datetime.now(timezone.utc) + timedelta(days=30)
+        
+        loan = {
+            "id": str(uuid.uuid4()),
+            "loan_number": loan_number,
+            "customer_id": customer["id"],
+            "sales_transaction_id": sales_transaction.id,
+            "transaction_number": transaction_number,
+            "principal_amount": total_amount,
+            "amount_paid": 0.0,
+            "balance": total_amount,
+            "issue_date": datetime.now(timezone.utc).isoformat(),
+            "due_date": due_date.isoformat(),
+            "status": "active",
+            "interest_rate": 0.0,
+            "days_overdue": 0,
+            "payments": [],
+            "branch_id": transaction.branch_id,
+            "created_by": transaction.sales_person_name,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        await db.loans.insert_one(loan)
+        
+        await log_audit(
+            user=transaction.sales_person_name,
+            action="create_loan_from_sale",
+            entity_type="loan",
+            entity_id=loan["id"],
+            details={
+                "loan_number": loan_number,
+                "customer": transaction.customer_name,
+                "amount": total_amount,
+                "due_date": due_date.isoformat()
+        }
+    )
+    
     return sales_transaction
 
 
-@api_router.post("/inventory-requests", response_model=InternalOrderRequisition)
-async def create_inventory_request_sales(order: InternalOrderCreate):
+@api_router.post("/stock-requests", response_model=InternalOrderRequisition)
+async def create_stock_request(order: InternalOrderCreate):
     """
-    Creates a new internal order requisition (sales team requesting flour stock).
-    Accessible only by users with 'Sales' role.
+    Creates a new stock request with automatic branch routing.
+    NEW 6-Stage Workflow: Admin → Manager → Storekeeper → Guard → Sales Confirmation
     """
     # Generate request number
-    request_count = await db.internal_order_requisitions.count_documents({})
-    request_number = f"REQ-{request_count + 1:06d}"
+    request_count = await db.stock_requests.count_documents({})
+    request_number = f"SR-{request_count + 1:06d}"
     
     # Calculate total weight based on package size
     package_size_map = {
-        "50kg": 50, "25kg": 25, "10kg": 10, "5kg": 5
+        "50kg": 50, "25kg": 25, "15kg": 15, "10kg": 10, "5kg": 5
     }
     package_weight = package_size_map.get(order.package_size, 0)
     if package_weight == 0:
-        raise HTTPException(status_code=400, detail="Invalid package size")
-    
+        # For bulk items like bran
+        package_weight = order.quantity  # quantity is kg directly
+        total_weight = order.quantity
+    else:
     total_weight = order.quantity * package_weight
     
-    # Create internal order
-    internal_order = InternalOrderRequisition(
+    # Determine source branch automatically
+    source_branch = await determine_source_branch(order.product_name)
+    
+    # Check if inventory is available
+    reservation_result = await reserve_inventory(order.product_name, source_branch, total_weight)
+    
+    if not reservation_result["success"]:
+        raise HTTPException(status_code=400, detail=reservation_result["error"])
+    
+    # Create stock request with workflow tracking
+    stock_request = InternalOrderRequisition(
         request_number=request_number,
         product_name=order.product_name,
         package_size=order.package_size,
         quantity=order.quantity,
         total_weight=total_weight,
         requested_by=order.requested_by,
-        status=InternalOrderStatus.PENDING_APPROVAL,
-        manager_approval_status=ManagerApprovalStatus.PENDING
+        branch_id=order.branch_id,
+        source_branch=source_branch,
+        status=InternalOrderStatus.PENDING_ADMIN_APPROVAL,
+        inventory_reserved=False,  # Will be set when admin approves
+        inventory_deducted=False,
+        delivery_confirmed=False,
+        workflow_history=[
+            {
+                "stage": "created",
+                "status": "completed",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "actor": order.requested_by,
+                "action": "Request created",
+                "notes": order.reason or ""
+            }
+        ]
     )
     
     # Save to database
-    order_dict = internal_order.model_dump()
+    order_dict = stock_request.model_dump()
     serialize_datetime(order_dict)
-    result = await db.internal_order_requisitions.insert_one(order_dict)
+    await db.stock_requests.insert_one(order_dict)
     
     # Log audit trail
     await log_audit(
         user=order.requested_by,
-        action="create_inventory_request",
-        entity_type="internal_order_requisition",
-        entity_id=internal_order.id,
+        action="create_stock_request",
+        entity_type="stock_request",
+        entity_id=stock_request.id,
         details={
             "request_number": request_number,
             "product_name": order.product_name,
             "quantity": order.quantity,
-            "package_size": order.package_size,
-            "total_weight": total_weight
+            "total_weight": total_weight,
+            "source_branch": source_branch,
+            "destination_branch": order.branch_id
         }
     )
     
-    return internal_order
+    return stock_request
+
+
+# Maintain backward compatibility
+@api_router.post("/inventory-requests", response_model=InternalOrderRequisition)
+async def create_inventory_request_sales(order: InternalOrderCreate):
+    """Legacy endpoint - redirects to new stock-requests endpoint"""
+    return await create_stock_request(order)
+
+
+@api_router.get("/stock-requests")
+async def get_stock_requests(
+    status: Optional[str] = None,
+    branch_id: Optional[str] = None,
+    requested_by: Optional[str] = None
+):
+    """Get stock requests with optional filters"""
+    query = {}
+    if status:
+        query["status"] = status
+    if branch_id:
+        query["branch_id"] = branch_id
+    if requested_by:
+        query["requested_by"] = requested_by
+    
+    requests = await db.stock_requests.find(query, {"_id": 0}).sort("requested_at", -1).to_list(1000)
+    
+    for req in requests:
+        deserialize_datetime(req)
+    
+    return requests
+
+
+@api_router.get("/stock-requests/{request_id}")
+async def get_stock_request(request_id: str):
+    """Get specific stock request with full details"""
+    request = await db.stock_requests.find_one({"id": request_id}, {"_id": 0})
+    
+    if not request:
+        raise HTTPException(status_code=404, detail="Stock request not found")
+    
+    deserialize_datetime(request)
+    return request
+
+
+@api_router.put("/stock-requests/{request_id}/approve-admin")
+async def approve_stock_request_admin(request_id: str, approval: AdminApprovalAction):
+    """STAGE 2: Admin/Owner approves stock request and reserves inventory"""
+    request = await db.stock_requests.find_one({"id": request_id}, {"_id": 0})
+    
+    if not request:
+        raise HTTPException(status_code=404, detail="Stock request not found")
+    
+    if request["status"] != InternalOrderStatus.PENDING_ADMIN_APPROVAL:
+        raise HTTPException(status_code=400, detail="Request not in pending admin approval state")
+    
+    # Create approval record
+    approval_record = ApprovalRecord(
+        approved_by=approval.approved_by,
+        notes=approval.notes
+    )
+    
+    # Update request
+    update_data = {
+        "status": InternalOrderStatus.ADMIN_APPROVED,
+        "admin_approval": serialize_datetime(approval_record.model_dump()),
+        "inventory_reserved": True
+    }
+    
+    # Add to workflow history
+    workflow_entry = {
+        "stage": "admin_approval",
+        "status": "approved",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "actor": approval.approved_by,
+        "action": "Approved by Admin",
+        "notes": approval.notes or ""
+    }
+    
+    await db.stock_requests.update_one(
+        {"id": request_id},
+        {
+            "$set": update_data,
+            "$push": {"workflow_history": workflow_entry}
+        }
+    )
+    
+    # Log audit
+    await log_audit(
+        user=approval.approved_by,
+        action="approve_stock_request_admin",
+        entity_type="stock_request",
+        entity_id=request_id,
+        details={"notes": approval.notes}
+    )
+    
+    # Automatically move to pending manager approval
+    await db.stock_requests.update_one(
+        {"id": request_id},
+        {"$set": {"status": InternalOrderStatus.PENDING_MANAGER_APPROVAL}}
+    )
+    
+    updated = await db.stock_requests.find_one({"id": request_id}, {"_id": 0})
+    deserialize_datetime(updated)
+    return updated
+
+
+@api_router.put("/stock-requests/{request_id}/approve-manager")
+async def approve_stock_request_manager(request_id: str, approval: ManagerApprovalAction):
+    """STAGE 3: Manager approves stock request"""
+    request = await db.stock_requests.find_one({"id": request_id}, {"_id": 0})
+    
+    if not request:
+        raise HTTPException(status_code=404, detail="Stock request not found")
+    
+    if request["status"] != InternalOrderStatus.PENDING_MANAGER_APPROVAL:
+        raise HTTPException(status_code=400, detail="Request not in pending manager approval state")
+    
+    # Create approval record
+    approval_record = ApprovalRecord(
+        approved_by=approval.approved_by,
+        notes=approval.notes
+    )
+    
+    # Update request
+    update_data = {
+        "status": InternalOrderStatus.MANAGER_APPROVED,
+        "manager_approval": serialize_datetime(approval_record.model_dump())
+    }
+    
+    workflow_entry = {
+        "stage": "manager_approval",
+        "status": "approved",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "actor": approval.approved_by,
+        "action": "Approved by Manager",
+        "notes": approval.notes or ""
+    }
+    
+    await db.stock_requests.update_one(
+        {"id": request_id},
+        {
+            "$set": update_data,
+            "$push": {"workflow_history": workflow_entry}
+        }
+    )
+    
+    await log_audit(
+        user=approval.approved_by,
+        action="approve_stock_request_manager",
+        entity_type="stock_request",
+        entity_id=request_id,
+        details={"notes": approval.notes}
+    )
+    
+    # Move to pending fulfillment
+    await db.stock_requests.update_one(
+        {"id": request_id},
+        {"$set": {"status": InternalOrderStatus.PENDING_FULFILLMENT}}
+    )
+    
+    updated = await db.stock_requests.find_one({"id": request_id}, {"_id": 0})
+    deserialize_datetime(updated)
+    return updated
+
+
+@api_router.put("/stock-requests/{request_id}/fulfill")
+async def fulfill_stock_request(request_id: str, fulfillment: FulfillmentAction):
+    """STAGE 4: Storekeeper fulfills request and deducts inventory"""
+    request = await db.stock_requests.find_one({"id": request_id}, {"_id": 0})
+    
+    if not request:
+        raise HTTPException(status_code=404, detail="Stock request not found")
+    
+    if request["status"] != InternalOrderStatus.PENDING_FULFILLMENT:
+        raise HTTPException(status_code=400, detail="Request not in pending fulfillment state")
+    
+    # Deduct inventory from source warehouse
+    await deduct_inventory_for_fulfillment(
+        request["product_name"],
+        request["source_branch"],
+        request["total_weight"],
+        f"Stock Request {request['request_number']}",
+        fulfillment.fulfilled_by
+    )
+    
+    # Generate packing slip number
+    packing_slip = fulfillment.packing_slip_number or f"PS-{request['request_number']}"
+    
+    fulfillment_record = {
+        "fulfilled_by": fulfillment.fulfilled_by,
+        "fulfilled_at": datetime.now(timezone.utc).isoformat(),
+        "packing_slip_number": packing_slip,
+        "actual_quantity": fulfillment.actual_quantity or request["quantity"],
+        "notes": fulfillment.notes or ""
+    }
+    
+    workflow_entry = {
+        "stage": "fulfillment",
+        "status": "completed",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "actor": fulfillment.fulfilled_by,
+        "action": "Fulfilled by Storekeeper",
+        "notes": fulfillment.notes or ""
+    }
+    
+    await db.stock_requests.update_one(
+        {"id": request_id},
+        {
+            "$set": {
+                "status": InternalOrderStatus.READY_FOR_PICKUP,
+                "fulfillment": fulfillment_record,
+                "inventory_deducted": True
+            },
+            "$push": {"workflow_history": workflow_entry}
+        }
+    )
+    
+    await log_audit(
+        user=fulfillment.fulfilled_by,
+        action="fulfill_stock_request",
+        entity_type="stock_request",
+        entity_id=request_id,
+        details={"packing_slip": packing_slip}
+    )
+    
+    updated = await db.stock_requests.find_one({"id": request_id}, {"_id": 0})
+    deserialize_datetime(updated)
+    return updated
+
+
+@api_router.put("/stock-requests/{request_id}/gate-verify")
+async def verify_at_gate(request_id: str, verification: GateVerificationAction):
+    """STAGE 5: Guard verifies at gate and issues gate pass"""
+    request = await db.stock_requests.find_one({"id": request_id}, {"_id": 0})
+    
+    if not request:
+        raise HTTPException(status_code=404, detail="Stock request not found")
+    
+    if request["status"] != InternalOrderStatus.READY_FOR_PICKUP:
+        raise HTTPException(status_code=400, detail="Request not ready for gate verification")
+    
+    gate_record = {
+        "verified_by": verification.verified_by,
+        "verified_at": datetime.now(timezone.utc).isoformat(),
+        "gate_pass_number": verification.gate_pass_number,
+        "vehicle_number": verification.vehicle_number,
+        "driver_name": verification.driver_name,
+        "exit_time": datetime.now(timezone.utc).isoformat(),
+        "notes": verification.notes or ""
+    }
+    
+    workflow_entry = {
+        "stage": "gate_verification",
+        "status": "completed",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "actor": verification.verified_by,
+        "action": "Verified and released at gate",
+        "notes": verification.notes or ""
+    }
+    
+    await db.stock_requests.update_one(
+        {"id": request_id},
+        {
+            "$set": {
+                "status": InternalOrderStatus.IN_TRANSIT,
+                "gate_verification": gate_record
+            },
+            "$push": {"workflow_history": workflow_entry}
+        }
+    )
+    
+    await log_audit(
+        user=verification.verified_by,
+        action="gate_verify_stock_request",
+        entity_type="stock_request",
+        entity_id=request_id,
+        details={"gate_pass": verification.gate_pass_number}
+    )
+    
+    updated = await db.stock_requests.find_one({"id": request_id}, {"_id": 0})
+    deserialize_datetime(updated)
+    return updated
+
+
+@api_router.put("/stock-requests/{request_id}/confirm-delivery")
+async def confirm_delivery(request_id: str, confirmation: DeliveryConfirmationAction):
+    """STAGE 6: Sales confirms receipt of delivery"""
+    request = await db.stock_requests.find_one({"id": request_id}, {"_id": 0})
+    
+    if not request:
+        raise HTTPException(status_code=404, detail="Stock request not found")
+    
+    if request["status"] != InternalOrderStatus.IN_TRANSIT:
+        raise HTTPException(status_code=400, detail="Request not in transit")
+    
+    # Add inventory to destination branch
+    await add_inventory_for_delivery(
+        request["product_name"],
+        request["branch_id"],
+        request["total_weight"],
+        f"Stock Request {request['request_number']}",
+        confirmation.confirmed_by
+    )
+    
+    delivery_record = {
+        "confirmed_by": confirmation.confirmed_by,
+        "confirmed_at": datetime.now(timezone.utc).isoformat(),
+        "received_quantity": confirmation.received_quantity,
+        "condition": confirmation.condition,
+        "notes": confirmation.notes or ""
+    }
+    
+    workflow_entry = {
+        "stage": "delivery_confirmation",
+        "status": "completed",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "actor": confirmation.confirmed_by,
+        "action": "Delivery confirmed",
+        "notes": confirmation.notes or ""
+    }
+    
+    await db.stock_requests.update_one(
+        {"id": request_id},
+        {
+            "$set": {
+                "status": InternalOrderStatus.CONFIRMED,
+                "delivery_confirmation": delivery_record,
+                "delivery_confirmed": True
+            },
+            "$push": {"workflow_history": workflow_entry}
+        }
+    )
+    
+    await log_audit(
+        user=confirmation.confirmed_by,
+        action="confirm_delivery_stock_request",
+        entity_type="stock_request",
+        entity_id=request_id,
+        details={"condition": confirmation.condition}
+    )
+    
+    updated = await db.stock_requests.find_one({"id": request_id}, {"_id": 0})
+    deserialize_datetime(updated)
+    return updated
+
+
+@api_router.put("/stock-requests/{request_id}/reject")
+async def reject_stock_request(request_id: str, rejection: InternalOrderRejection):
+    """Reject stock request at any stage"""
+    request = await db.stock_requests.find_one({"id": request_id}, {"_id": 0})
+    
+    if not request:
+        raise HTTPException(status_code=404, detail="Stock request not found")
+    
+    if request["status"] in [InternalOrderStatus.CONFIRMED, InternalOrderStatus.REJECTED]:
+        raise HTTPException(status_code=400, detail="Cannot reject completed or already rejected request")
+    
+    # Unreserve inventory if it was reserved
+    if request.get("inventory_reserved") and not request.get("inventory_deducted"):
+        # Inventory was reserved but not yet deducted, nothing to unreserve in our simple model
+        pass
+    
+    workflow_entry = {
+        "stage": rejection.stage,
+        "status": "rejected",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "actor": rejection.rejected_by,
+        "action": f"Rejected at {rejection.stage}",
+        "notes": rejection.reason
+    }
+    
+    await db.stock_requests.update_one(
+        {"id": request_id},
+        {
+            "$set": {
+                "status": InternalOrderStatus.REJECTED,
+                "rejection_reason": rejection.reason,
+                "rejected_by": rejection.rejected_by,
+                "rejected_at": datetime.now(timezone.utc).isoformat(),
+                "rejected_at_stage": rejection.stage
+            },
+            "$push": {"workflow_history": workflow_entry}
+        }
+    )
+    
+    await log_audit(
+        user=rejection.rejected_by,
+        action="reject_stock_request",
+        entity_type="stock_request",
+        entity_id=request_id,
+        details={"reason": rejection.reason, "stage": rejection.stage}
+    )
+    
+    updated = await db.stock_requests.find_one({"id": request_id}, {"_id": 0})
+    deserialize_datetime(updated)
+    return updated
 
 
 @api_router.post("/purchase-requests", response_model=PurchaseRequisition)
@@ -1587,6 +2443,707 @@ async def get_sales_report(
         "transactions": transactions,
         "top_products": [{"name": name, "quantity_sold": qty} for name, qty in top_products]
     }
+
+
+@api_router.get("/finance/transactions")
+async def get_finance_transactions(
+    branch_id: Optional[str] = None,
+    account_type: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    limit: int = 100
+):
+    """
+    Get finance transactions with optional filters
+    """
+    query = {}
+    
+    if branch_id:
+        query["branch_id"] = branch_id
+    if account_type:
+        query["account_type"] = account_type
+    
+    if start_date and end_date:
+        try:
+            start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+            end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+            query["created_at"] = {"$gte": start_dt.isoformat(), "$lte": end_dt.isoformat()}
+        except ValueError:
+            pass
+    
+    transactions = await db.finance_transactions.find(
+        query, {"_id": 0}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+    
+    return transactions
+
+
+@api_router.get("/finance/summary")
+async def get_finance_summary(branch_id: Optional[str] = None):
+    """
+    Get finance summary by account type
+    """
+    query = {}
+    if branch_id:
+        query["branch_id"] = branch_id
+    
+    transactions = await db.finance_transactions.find(query, {"_id": 0}).to_list(10000)
+    
+    summary = {
+        "total_income": 0,
+        "total_expense": 0,
+        "cash_account": 0,
+        "bank_account": 0,
+        "loan_account": 0,
+        "reconciled_count": 0,
+        "unreconciled_count": 0
+    }
+    
+    for txn in transactions:
+        amount = txn.get("amount", 0)
+        if txn.get("type") == "income":
+            summary["total_income"] += amount
+        else:
+            summary["total_expense"] += amount
+        
+        if txn.get("account_type") == "cash":
+            summary["cash_account"] += amount
+        elif txn.get("account_type") == "bank":
+            summary["bank_account"] += amount
+        elif txn.get("account_type") == "loan":
+            summary["loan_account"] += amount
+        
+        if txn.get("reconciled"):
+            summary["reconciled_count"] += 1
+        else:
+            summary["unreconciled_count"] += 1
+    
+    summary["net_balance"] = summary["total_income"] - summary["total_expense"]
+    
+    return summary
+
+
+@api_router.get("/recent-activity")
+async def get_recent_activity(branch_id: Optional[str] = None, user_id: Optional[str] = None, limit: int = 10):
+    """
+    Get recent activity for the dashboard (sales transactions, stock requests, purchase requests)
+    """
+    activities = []
+    
+    # Get recent sales transactions
+    sales_query = {}
+    if branch_id:
+        sales_query["branch_id"] = branch_id
+    if user_id:
+        sales_query["sales_person_id"] = user_id
+    
+    recent_sales = await db.sales_transactions.find(
+        sales_query, {"_id": 0}
+    ).sort("timestamp", -1).limit(5).to_list(5)
+    
+    for sale in recent_sales:
+        deserialize_datetime(sale)
+        time_ago = get_time_ago(sale.get("timestamp"))
+        activities.append({
+            "action": f"Completed sale {sale.get('transaction_number')}",
+            "time": time_ago,
+            "type": "success",
+            "timestamp": sale.get("timestamp")
+        })
+    
+    # Get recent stock requests
+    stock_query = {}
+    if user_id:
+        stock_query["requested_by"] = user_id
+    
+    recent_requests = await db.internal_order_requisitions.find(
+        stock_query, {"_id": 0}
+    ).sort("requested_at", -1).limit(5).to_list(5)
+    
+    for req in recent_requests:
+        deserialize_datetime(req)
+        time_ago = get_time_ago(req.get("requested_at"))
+        status = req.get("status", "pending_approval")
+        
+        if status == "fulfilled":
+            action = f"Stock request {req.get('request_number')} fulfilled"
+            act_type = "success"
+        elif "approved" in status:
+            action = f"Stock request {req.get('request_number')} approved"
+            act_type = "success"
+        elif status == "rejected":
+            action = f"Stock request {req.get('request_number')} rejected"
+            act_type = "warning"
+        else:
+            action = f"Stock request {req.get('request_number')} pending"
+            act_type = "info"
+        
+        activities.append({
+            "action": action,
+            "time": time_ago,
+            "type": act_type,
+            "timestamp": req.get("requested_at")
+        })
+    
+    # Get low stock alerts
+    low_stock_items = await db.inventory.find(
+        {"stock_level": {"$in": ["low", "critical"]}}, {"_id": 0}
+    ).limit(3).to_list(3)
+    
+    for item in low_stock_items:
+        activities.append({
+            "action": f"Low stock alert: {item.get('name')}",
+            "time": "Now",
+            "type": "warning",
+            "timestamp": datetime.now(timezone.utc)
+        })
+    
+    # Sort all activities by timestamp
+    activities.sort(key=lambda x: x.get("timestamp", datetime.min), reverse=True)
+    
+    # Return limited number
+    return activities[:limit]
+
+
+# ==================== CUSTOMER & LOAN MANAGEMENT ENDPOINTS ====================
+
+@api_router.post("/customers", response_model=Customer)
+async def create_customer(customer: CustomerCreate):
+    """Create a new customer account for credit/loan tracking"""
+    # Generate customer number
+    customer_count = await db.customers.count_documents({})
+    customer_number = f"CUST-{customer_count + 1:05d}"
+    
+    new_customer = Customer(
+        **customer.model_dump(),
+        customer_number=customer_number,
+        credit_available=customer.credit_limit
+    )
+    
+    doc = new_customer.model_dump()
+    serialize_datetime(doc)
+    await db.customers.insert_one(doc)
+    
+    await log_audit(
+        user=customer.registered_by,
+        action="create_customer",
+        entity_type="customer",
+        entity_id=new_customer.id,
+        details={
+            "customer_number": customer_number,
+            "name": customer.name,
+            "credit_limit": customer.credit_limit
+        }
+    )
+    
+    return new_customer
+
+
+@api_router.get("/customers")
+async def get_customers(branch_id: Optional[str] = None, status: Optional[str] = None):
+    """Get all customers with optional filters"""
+    query = {}
+    if branch_id:
+        query["branch_id"] = branch_id
+    if status:
+        query["status"] = status
+    
+    customers = await db.customers.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    
+    for customer in customers:
+        deserialize_datetime(customer)
+    
+    return customers
+
+
+@api_router.get("/customers/{customer_id}")
+async def get_customer(customer_id: str):
+    """Get customer details with loan history"""
+    customer = await db.customers.find_one({"id": customer_id}, {"_id": 0})
+    
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    
+    deserialize_datetime(customer)
+    
+    # Get customer's loans
+    loans = await db.loans.find({"customer_id": customer_id}, {"_id": 0}).to_list(100)
+    for loan in loans:
+        deserialize_datetime(loan)
+    
+    customer["loans"] = loans
+    
+    return customer
+
+
+@api_router.put("/customers/{customer_id}")
+async def update_customer(customer_id: str, updates: Dict):
+    """Update customer information"""
+    customer = await db.customers.find_one({"id": customer_id}, {"_id": 0})
+    
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    
+    updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    await db.customers.update_one({"id": customer_id}, {"$set": updates})
+    
+    updated = await db.customers.find_one({"id": customer_id}, {"_id": 0})
+    deserialize_datetime(updated)
+    
+    return updated
+
+
+@api_router.post("/loans", response_model=Loan)
+async def create_loan(loan: LoanCreate):
+    """Create a new loan from a sales transaction"""
+    # Verify customer exists
+    customer = await db.customers.find_one({"id": loan.customer_id}, {"_id": 0})
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    
+    # Check credit limit
+    if customer["credit_used"] + loan.principal_amount > customer["credit_limit"]:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Exceeds credit limit. Available: {customer['credit_available']}, Requested: {loan.principal_amount}"
+        )
+    
+    # Generate loan number
+    loan_count = await db.loans.count_documents({})
+    loan_number = f"LOAN-{loan_count + 1:06d}"
+    
+    # Get transaction info
+    transaction = await db.sales_transactions.find_one({"id": loan.sales_transaction_id}, {"_id": 0})
+    
+    new_loan = Loan(
+        **loan.model_dump(),
+        loan_number=loan_number,
+        transaction_number=transaction.get("transaction_number", ""),
+        balance=loan.principal_amount
+    )
+    
+    doc = new_loan.model_dump()
+    serialize_datetime(doc)
+    await db.loans.insert_one(doc)
+    
+    # Update customer credit
+    await db.customers.update_one(
+        {"id": loan.customer_id},
+        {
+            "$inc": {
+                "credit_used": loan.principal_amount,
+                "outstanding_balance": loan.principal_amount,
+                "total_credit_used": loan.principal_amount
+            },
+            "$set": {
+                "credit_available": customer["credit_limit"] - (customer["credit_used"] + loan.principal_amount),
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+        }
+    )
+    
+    await log_audit(
+        user=loan.created_by,
+        action="create_loan",
+        entity_type="loan",
+        entity_id=new_loan.id,
+        details={
+            "loan_number": loan_number,
+            "customer_id": loan.customer_id,
+            "amount": loan.principal_amount
+        }
+    )
+    
+    return new_loan
+
+
+@api_router.get("/loans")
+async def get_loans(
+    customer_id: Optional[str] = None,
+    status: Optional[LoanStatus] = None,
+    branch_id: Optional[str] = None
+):
+    """Get loans with optional filters"""
+    query = {}
+    if customer_id:
+        query["customer_id"] = customer_id
+    if status:
+        query["status"] = status
+    if branch_id:
+        query["branch_id"] = branch_id
+    
+    loans = await db.loans.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    
+    # Update overdue status
+    for loan in loans:
+        deserialize_datetime(loan)
+        
+        # Check if overdue
+        if loan["status"] == "active" and loan["balance"] > 0:
+            due_date = loan["due_date"]
+            if isinstance(due_date, str):
+                due_date = datetime.fromisoformat(due_date.replace('Z', '+00:00'))
+            
+            if datetime.now(timezone.utc) > due_date:
+                days_overdue = (datetime.now(timezone.utc) - due_date).days
+                loan["days_overdue"] = days_overdue
+                loan["status"] = "overdue"
+                
+                # Update in database
+                await db.loans.update_one(
+                    {"id": loan["id"]},
+                    {"$set": {"status": "overdue", "days_overdue": days_overdue}}
+                )
+    
+    return loans
+
+
+@api_router.get("/loans/{loan_id}")
+async def get_loan(loan_id: str):
+    """Get specific loan with payment history"""
+    loan = await db.loans.find_one({"id": loan_id}, {"_id": 0})
+    
+    if not loan:
+        raise HTTPException(status_code=404, detail="Loan not found")
+    
+    deserialize_datetime(loan)
+    
+    return loan
+
+
+@api_router.post("/loans/{loan_id}/payment")
+async def record_loan_payment(loan_id: str, payment: LoanPaymentCreate):
+    """Record a payment against a loan"""
+    loan = await db.loans.find_one({"id": loan_id}, {"_id": 0})
+    
+    if not loan:
+        raise HTTPException(status_code=404, detail="Loan not found")
+    
+    if loan["status"] == "paid":
+        raise HTTPException(status_code=400, detail="Loan already paid in full")
+    
+    # Generate payment number
+    payment_count = len(loan.get("payments", []))
+    payment_number = f"{loan['loan_number']}-PAY-{payment_count + 1:03d}"
+    
+    payment_record = {
+        "id": str(uuid.uuid4()),
+        "payment_number": payment_number,
+        "amount": payment.amount,
+        "payment_date": datetime.now(timezone.utc).isoformat(),
+        "payment_method": payment.payment_method,
+        "received_by": payment.received_by,
+        "receipt_number": payment.receipt_number,
+        "notes": payment.notes
+    }
+    
+    # Update loan
+    new_balance = loan["balance"] - payment.amount
+    new_amount_paid = loan["amount_paid"] + payment.amount
+    new_status = "paid" if new_balance <= 0 else loan.get("status", "active")
+    
+    await db.loans.update_one(
+        {"id": loan_id},
+        {
+            "$set": {
+                "balance": max(0, new_balance),
+                "amount_paid": new_amount_paid,
+                "status": new_status,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            },
+            "$push": {"payments": payment_record}
+        }
+    )
+    
+    # Update customer credit
+    customer = await db.customers.find_one({"id": loan["customer_id"]}, {"_id": 0})
+    if customer:
+        await db.customers.update_one(
+            {"id": loan["customer_id"]},
+            {
+                "$inc": {
+                    "credit_used": -payment.amount,
+                    "outstanding_balance": -payment.amount,
+                    "total_paid": payment.amount
+                },
+                "$set": {
+                    "credit_available": customer["credit_limit"] - (customer["credit_used"] - payment.amount),
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }
+            }
+        )
+    
+    # Create finance transaction for payment received
+    finance_txn_count = await db.finance_transactions.count_documents({})
+    finance_txn_number = f"FIN-{finance_txn_count + 1:06d}"
+    
+    finance_transaction = {
+        "id": str(uuid.uuid4()),
+        "transaction_number": finance_txn_number,
+        "type": "income",
+        "source_type": "loan_payment",
+        "source_id": loan_id,
+        "source_reference": payment_number,
+        "amount": payment.amount,
+        "payment_method": payment.payment_method,
+        "account_type": "cash" if payment.payment_method == "cash" else "bank",
+        "branch_id": loan.get("branch_id"),
+        "description": f"Loan payment - {loan['loan_number']}",
+        "processed_by": payment.received_by,
+        "reconciled": False,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.finance_transactions.insert_one(finance_transaction)
+    
+    await log_audit(
+        user=payment.received_by,
+        action="record_loan_payment",
+        entity_type="loan",
+        entity_id=loan_id,
+        details={
+            "amount": payment.amount,
+            "new_balance": max(0, new_balance),
+            "payment_method": payment.payment_method
+        }
+    )
+    
+    updated_loan = await db.loans.find_one({"id": loan_id}, {"_id": 0})
+    deserialize_datetime(updated_loan)
+    
+    return updated_loan
+
+
+@api_router.get("/loans/overdue")
+async def get_overdue_loans(branch_id: Optional[str] = None):
+    """Get all overdue loans"""
+    query = {"status": "overdue"}
+    if branch_id:
+        query["branch_id"] = branch_id
+    
+    loans = await db.loans.find(query, {"_id": 0}).sort("days_overdue", -1).to_list(1000)
+    
+    for loan in loans:
+        deserialize_datetime(loan)
+        
+        # Get customer info
+        customer = await db.customers.find_one({"id": loan["customer_id"]}, {"_id": 0})
+        if customer:
+            loan["customer_name"] = customer["name"]
+            loan["customer_phone"] = customer["phone"]
+    
+    return loans
+
+
+@api_router.get("/reports/loan-aging")
+async def get_loan_aging_report(branch_id: Optional[str] = None):
+    """Get loan aging report"""
+    query = {"status": {"$in": ["active", "overdue"]}}
+    if branch_id:
+        query["branch_id"] = branch_id
+    
+    loans = await db.loans.find(query, {"_id": 0}).to_list(1000)
+    
+    aging_buckets = {
+        "current": {"count": 0, "amount": 0},
+        "1-30": {"count": 0, "amount": 0},
+        "31-60": {"count": 0, "amount": 0},
+        "61-90": {"count": 0, "amount": 0},
+        "over_90": {"count": 0, "amount": 0}
+    }
+    
+    for loan in loans:
+        deserialize_datetime(loan)
+        balance = loan.get("balance", 0)
+        
+        due_date = loan["due_date"]
+        if isinstance(due_date, str):
+            due_date = datetime.fromisoformat(due_date.replace('Z', '+00:00'))
+        
+        days_diff = (datetime.now(timezone.utc) - due_date).days
+        
+        if days_diff <= 0:
+            aging_buckets["current"]["count"] += 1
+            aging_buckets["current"]["amount"] += balance
+        elif days_diff <= 30:
+            aging_buckets["1-30"]["count"] += 1
+            aging_buckets["1-30"]["amount"] += balance
+        elif days_diff <= 60:
+            aging_buckets["31-60"]["count"] += 1
+            aging_buckets["31-60"]["amount"] += balance
+        elif days_diff <= 90:
+            aging_buckets["61-90"]["count"] += 1
+            aging_buckets["61-90"]["amount"] += balance
+        else:
+            aging_buckets["over_90"]["count"] += 1
+            aging_buckets["over_90"]["amount"] += balance
+    
+    total_outstanding = sum(bucket["amount"] for bucket in aging_buckets.values())
+    
+    return {
+        "aging_buckets": aging_buckets,
+        "total_outstanding": total_outstanding,
+        "total_loans": len(loans)
+    }
+
+
+def get_time_ago(timestamp):
+    """Helper function to get human-readable time ago"""
+    if not timestamp:
+        return "Unknown"
+    
+    now = datetime.now(timezone.utc)
+    if isinstance(timestamp, str):
+        try:
+            timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+        except:
+            return "Unknown"
+    
+    # Make timestamp timezone-aware if it isn't
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.replace(tzinfo=timezone.utc)
+    
+    diff = now - timestamp
+    
+    if diff.days > 0:
+        if diff.days == 1:
+            return "1 day ago"
+        return f"{diff.days} days ago"
+    
+    hours = diff.seconds // 3600
+    if hours > 0:
+        if hours == 1:
+            return "1 hour ago"
+        return f"{hours} hours ago"
+    
+    minutes = diff.seconds // 60
+    if minutes > 0:
+        if minutes == 1:
+            return "1 minute ago"
+        return f"{minutes} minutes ago"
+    
+    return "Just now"
+
+
+async def determine_source_branch(product_name: str):
+    """Determine which warehouse branch has the product"""
+    # Product-to-branch mapping
+    product_branch_map = {
+        "1st Quality": "main_warehouse",
+        "Bread Flour": "girmay_warehouse",
+        "White Fruskela": "main_warehouse",
+        "Red Fruskela": "girmay_warehouse",
+        "Furska": "main_warehouse"
+    }
+    
+    # Check which product type it matches
+    for product_type, branch in product_branch_map.items():
+        if product_type in product_name:
+            return branch
+    
+    # Default to checking both warehouses for availability
+    return "main_warehouse"
+
+
+async def reserve_inventory(product_name: str, source_branch: str, quantity_kg: float):
+    """Reserve inventory for a pending request"""
+    # Find the product in inventory
+    product = await db.inventory.find_one({
+        "name": product_name,
+        "branch_id": source_branch
+    }, {"_id": 0})
+    
+    if not product:
+        return {"success": False, "error": "Product not found in source branch"}
+    
+    available_qty = product.get("quantity", 0)
+    
+    if available_qty < quantity_kg:
+        return {"success": False, "error": f"Insufficient stock. Available: {available_qty}kg, Requested: {quantity_kg}kg"}
+    
+    # Reserve the quantity (we'll track this separately)
+    # For now, we don't actually deduct, just mark as reserved in the request
+    return {"success": True, "available": available_qty}
+
+
+async def deduct_inventory_for_fulfillment(product_name: str, source_branch: str, quantity_kg: float, reference: str, performed_by: str):
+    """Actually deduct inventory when storekeeper fulfills"""
+    product = await db.inventory.find_one({
+        "name": product_name,
+        "branch_id": source_branch
+    }, {"_id": 0})
+    
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    
+    if product["quantity"] < quantity_kg:
+        raise HTTPException(status_code=400, detail="Insufficient inventory")
+    
+    # Deduct quantity
+    new_quantity = product["quantity"] - quantity_kg
+    
+    # Update inventory
+    await db.inventory.update_one(
+        {"id": product["id"]},
+        {
+            "$set": {
+                "quantity": new_quantity,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            },
+            "$push": {
+                "transactions": {
+                    "id": str(uuid.uuid4()),
+                    "date": datetime.now(timezone.utc).isoformat(),
+                    "type": "out",
+                    "quantity": quantity_kg,
+                    "reference": reference,
+                    "performed_by": performed_by
+                }
+            }
+        }
+    )
+    
+    return {"success": True, "new_quantity": new_quantity}
+
+
+async def add_inventory_for_delivery(product_name: str, dest_branch: str, quantity_kg: float, reference: str, performed_by: str):
+    """Add inventory to destination when sales confirms delivery"""
+    # Find or create product in destination branch
+    product = await db.inventory.find_one({
+        "name": product_name,
+        "branch_id": dest_branch
+    }, {"_id": 0})
+    
+    if product:
+        # Update existing
+        new_quantity = product["quantity"] + quantity_kg
+        await db.inventory.update_one(
+            {"id": product["id"]},
+            {
+                "$set": {
+                    "quantity": new_quantity,
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                },
+                "$push": {
+                    "transactions": {
+                        "id": str(uuid.uuid4()),
+                        "date": datetime.now(timezone.utc).isoformat(),
+                        "type": "in",
+                        "quantity": quantity_kg,
+                        "reference": reference,
+                        "performed_by": performed_by
+                    }
+                }
+            }
+        )
+    else:
+        # Create new inventory item in destination
+        # (This would be a new product entry for this branch)
+        pass
+    
+    return {"success": True}
 
 
 # Include the router in the main app

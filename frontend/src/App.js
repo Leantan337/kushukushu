@@ -19,14 +19,20 @@ import StoreKeeperDashboard from "./components/storekeeper/StoreKeeperDashboard"
 import SimplePOS from "./components/demo/SimplePOS";
 import SimpleInventoryDashboard from "./components/demo/SimpleInventoryDashboard";
 import SimpleSalesDashboard from "./components/demo/SimpleSalesDashboard";
-import FinanceDashboard from "./components/demo/FinanceDashboard";
+import DemoFinanceDashboard from "./components/demo/FinanceDashboard";
 import DemoLanding from "./components/demo/DemoLanding";
+import FinanceDashboard from "./components/finance/FinanceDashboard";
+import PaymentProcessing from "./components/finance/PaymentProcessing";
+import DailyReconciliation from "./components/finance/DailyReconciliation";
+import AccountsReceivable from "./components/finance/AccountsReceivable";
 import { Toaster } from "./components/ui/toaster";
+import { AppProvider } from "./context/AppContext";
 
 function App() {
   return (
-    <div className="App">
-      <BrowserRouter>
+    <AppProvider>
+      <div className="App">
+        <BrowserRouter>
         <Routes>
           {/* Unified Login - Entry point for all users */}
           <Route path="/" element={<UnifiedLogin />} />
@@ -71,14 +77,18 @@ function App() {
           <Route path="/demo/pos" element={<SimplePOS />} />
           <Route path="/demo/inventory" element={<SimpleInventoryDashboard />} />
           <Route path="/demo/sales" element={<SimpleSalesDashboard />} />
-          <Route path="/demo/finance" element={<FinanceDashboard />} />
+          <Route path="/demo/finance" element={<DemoFinanceDashboard />} />
           
           {/* Finance Routes */}
           <Route path="/finance/dashboard" element={<FinanceDashboard />} />
+          <Route path="/finance/payment-processing" element={<PaymentProcessing />} />
+          <Route path="/finance/reconciliation" element={<DailyReconciliation />} />
+          <Route path="/finance/receivables" element={<AccountsReceivable />} />
         </Routes>
       </BrowserRouter>
       <Toaster />
     </div>
+    </AppProvider>
   );
 }
 
