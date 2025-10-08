@@ -286,6 +286,18 @@ backend:
         comment: "Implemented complete Sales Dashboard with 5 tabs: Overview (stats, quick actions, recent activity), Point of Sale (cart system with payment types), Stock Requests (flour request form with package size selection), Purchase Requests (supply request form with templates), and Sales Reports (performance analytics with period filtering). All components integrated with backend APIs, include proper error handling, loading states, and success feedback. Added logout functionality."
 
 frontend:
+  - task: "Logout Functionality"
+    implemented: true
+    working: true
+    file: "OwnerDashboard.jsx, AdminDashboard.jsx, ManagerDashboard.jsx, SalesDashboard.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Added logout functionality to all dashboards (Owner, Admin, Manager, Sales). Logout button clears localStorage and sessionStorage, then redirects to login page. Consistent styling with red color scheme across all dashboards."
+
   - task: "Update localization from Nigerian to Ethiopian (currency, locations)"
     implemented: true
     working: "NA"
