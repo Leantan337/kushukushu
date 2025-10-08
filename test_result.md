@@ -101,3 +101,107 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: "Revise wheat flour factory owner's dashboard with Ethiopian localization (Adigrat, ETB currency), enhance dashboard with profitability metrics and inventory levels, update ratio configuration to include waste percentage totaling 100%, create new Reports section for historical trends, and create User Management section for staff overview."
+
+backend:
+  - task: "Backend API endpoints for new dashboard metrics"
+    implemented: false
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history: []
+
+  - task: "Backend API for reports functionality"
+    implemented: false
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history: []
+
+  - task: "Backend API for user management"
+    implemented: false
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history: []
+
+frontend:
+  - task: "Update localization from Nigerian to Ethiopian (currency, locations)"
+    implemented: false
+    working: "NA"
+    file: "mockData.js, OwnerDashboard.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history: []
+
+  - task: "Enhance owner dashboard with profitability and inventory widgets"
+    implemented: false
+    working: "NA"
+    file: "OwnerDashboard.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history: []
+
+  - task: "Update ratio configuration to include waste percentage"
+    implemented: false
+    working: "NA"
+    file: "RatioConfiguration.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history: []
+
+  - task: "Create Reports section component"
+    implemented: false
+    working: "NA"
+    file: "ReportsScreen.jsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history: []
+
+  - task: "Create User Management section for owner"
+    implemented: false
+    working: "NA"
+    file: "UserManagement.jsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history: []
+
+  - task: "Update routing for new sections"
+    implemented: false
+    working: "NA"
+    file: "App.js"
+    stuck_count: 0
+    priority: "low"
+    needs_retesting: true
+    status_history: []
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 0
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Update localization from Nigerian to Ethiopian"
+    - "Enhance owner dashboard with profitability and inventory widgets"
+    - "Update ratio configuration to include waste percentage"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: "Starting implementation of Ethiopian localization and dashboard enhancements for wheat flour factory owner interface. Will implement changes incrementally and test each component."
