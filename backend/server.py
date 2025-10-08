@@ -653,9 +653,13 @@ async def get_status_checks():
 # ==================== INVENTORY MANAGEMENT ENDPOINTS ====================
 
 @api_router.get("/inventory", response_model=List[InventoryItem])
-async def get_inventory():
-    """Get all inventory items"""
-    items = await db.inventory.find({}, {"_id": 0}).to_list(1000)
+async def get_inventory(branch_id: Optional[str] = None):
+    """Get all inventory items, optionally filtered by branch"""
+    query = {}
+    if branch_id:
+        query["branch_id"] = branch_id
+    
+    items = await db.inventory.find(query, {"_id": 0}).to_list(1000)
     for item in items:
         deserialize_datetime(item)
     return items
@@ -1216,184 +1220,22 @@ async def reject_purchase_requisition(req_id: str, rejection: PurchaseRequisitio
 
 # ==================== INTERNAL ORDER REQUISITION ENDPOINTS ====================
 
-@api_router.get("/internal-orders", response_model=List[InternalOrderRequisition])
-async def get_internal_orders(status: Optional[InternalOrderStatus] = None):
-    """Get all internal order requisitions, optionally filtered by status"""
-    query = {}
-    if status:
-        query["status"] = status
-    
-    orders = await db.internal_orders.find(query, {"_id": 0}).to_list(1000)
-    for order in orders:
-        deserialize_datetime(order)
-    return orders
+# ==================== LEGACY INTERNAL ORDERS - COMMENTED OUT ====================
+# NOTE: These endpoints have been replaced by the new /stock-requests workflow
+# Keeping them here for backward compatibility if needed
+# To re-enable, uncomment and add the missing model classes
 
-@api_router.get("/internal-orders/{order_id}", response_model=InternalOrderRequisition)
-async def get_internal_order(order_id: str):
-    """Get a specific internal order requisition"""
-    order = await db.internal_orders.find_one({"id": order_id}, {"_id": 0})
-    if not order:
-        raise HTTPException(status_code=404, detail="Internal order not found")
-    deserialize_datetime(order)
-    return order
-
-@api_router.post("/internal-orders", response_model=InternalOrderRequisition)
-async def create_internal_order(order: InternalOrderCreate):
-    """Create a new internal order requisition (flour request)"""
-    # Generate request number
-    count = await db.internal_orders.count_documents({})
-    request_number = f"IO-{count + 1:05d}"
-    
-    # Calculate total weight
-    package_size_kg = float(order.package_size.replace("kg", ""))
-    total_weight = package_size_kg * order.quantity
-    
-    internal_order = InternalOrderRequisition(
-        **order.model_dump(),
-        request_number=request_number,
-        total_weight=total_weight
-    )
-    
-    doc = internal_order.model_dump()
-    serialize_datetime(doc)
-    
-    await db.internal_orders.insert_one(doc)
-    
-    # Create audit log
-    audit_log = AuditLog(
-        user=order.requested_by,
-        action="create_internal_order",
-        entity_type="internal_order",
-        entity_id=internal_order.id,
-        details={
-            "product": order.product_name,
-            "quantity": order.quantity,
-            "package_size": order.package_size,
-            "total_weight": total_weight
-        }
-    )
-    await db.audit_logs.insert_one(serialize_datetime(audit_log.model_dump()))
-    
-    return internal_order
-
-@api_router.put("/internal-orders/{order_id}/approve", response_model=InternalOrderRequisition)
-async def approve_internal_order(order_id: str, approval: InternalOrderApproval):
-    """Approve an internal order requisition"""
-    order = await db.internal_orders.find_one({"id": order_id}, {"_id": 0})
-    if not order:
-        raise HTTPException(status_code=404, detail="Internal order not found")
-    
-    if order["status"] != InternalOrderStatus.PENDING_APPROVAL:
-        raise HTTPException(status_code=400, detail="Order not in pending approval state")
-    
-    update_data = {
-        "status": InternalOrderStatus.APPROVED,
-        "approved_by": approval.approved_by,
-        "approved_at": datetime.now(timezone.utc).isoformat()
-    }
-    
-    await db.internal_orders.update_one({"id": order_id}, {"$set": update_data})
-    
-    # Create audit log
-    audit_log = AuditLog(
-        user=approval.approved_by,
-        action="approve_internal_order",
-        entity_type="internal_order",
-        entity_id=order_id,
-        details={}
-    )
-    await db.audit_logs.insert_one(serialize_datetime(audit_log.model_dump()))
-    
-    updated_order = await db.internal_orders.find_one({"id": order_id}, {"_id": 0})
-    deserialize_datetime(updated_order)
-    return updated_order
-
-@api_router.put("/internal-orders/{order_id}/fulfill", response_model=InternalOrderRequisition)
-async def fulfill_internal_order(order_id: str, fulfillment: InternalOrderFulfillment):
-    """Fulfill an internal order (auto-deduct from inventory)"""
-    order = await db.internal_orders.find_one({"id": order_id}, {"_id": 0})
-    if not order:
-        raise HTTPException(status_code=404, detail="Internal order not found")
-    
-    if order["status"] != InternalOrderStatus.APPROVED:
-        raise HTTPException(status_code=400, detail="Order must be approved before fulfillment")
-    
-    # Find the inventory item for this product
-    inventory_item = await db.inventory.find_one({"name": order["product_name"]}, {"_id": 0})
-    if not inventory_item:
-        raise HTTPException(status_code=404, detail=f"Inventory item '{order['product_name']}' not found")
-    
-    # Check if enough inventory
-    if inventory_item["quantity"] < order["total_weight"]:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Insufficient inventory. Available: {inventory_item['quantity']}kg, Required: {order['total_weight']}kg"
-        )
-    
-    # Deduct from inventory
-    await add_inventory_transaction(
-        inventory_item["id"],
-        "out",
-        order["total_weight"],
-        f"Internal Order {order['request_number']}",
-        fulfillment.fulfilled_by
-    )
-    
-    # Update order status
-    update_data = {
-        "status": InternalOrderStatus.FULFILLED,
-        "fulfilled_by": fulfillment.fulfilled_by,
-        "fulfilled_at": datetime.now(timezone.utc).isoformat()
-    }
-    
-    await db.internal_orders.update_one({"id": order_id}, {"$set": update_data})
-    
-    # Create audit log
-    audit_log = AuditLog(
-        user=fulfillment.fulfilled_by,
-        action="fulfill_internal_order",
-        entity_type="internal_order",
-        entity_id=order_id,
-        details={"inventory_deducted": order["total_weight"]}
-    )
-    await db.audit_logs.insert_one(serialize_datetime(audit_log.model_dump()))
-    
-    updated_order = await db.internal_orders.find_one({"id": order_id}, {"_id": 0})
-    deserialize_datetime(updated_order)
-    return updated_order
-
-@api_router.put("/internal-orders/{order_id}/reject", response_model=InternalOrderRequisition)
-async def reject_internal_order(order_id: str, rejection: InternalOrderRejection):
-    """Reject an internal order requisition"""
-    order = await db.internal_orders.find_one({"id": order_id}, {"_id": 0})
-    if not order:
-        raise HTTPException(status_code=404, detail="Internal order not found")
-    
-    if order["status"] in [InternalOrderStatus.FULFILLED, InternalOrderStatus.REJECTED]:
-        raise HTTPException(status_code=400, detail="Cannot reject fulfilled or already rejected order")
-    
-    update_data = {
-        "status": InternalOrderStatus.REJECTED,
-        "rejection_reason": rejection.reason,
-        "rejected_by": rejection.rejected_by,
-        "rejected_at": datetime.now(timezone.utc).isoformat()
-    }
-    
-    await db.internal_orders.update_one({"id": order_id}, {"$set": update_data})
-    
-    # Create audit log
-    audit_log = AuditLog(
-        user=rejection.rejected_by,
-        action="reject_internal_order",
-        entity_type="internal_order",
-        entity_id=order_id,
-        details={"reason": rejection.reason}
-    )
-    await db.audit_logs.insert_one(serialize_datetime(audit_log.model_dump()))
-    
-    updated_order = await db.internal_orders.find_one({"id": order_id}, {"_id": 0})
-    deserialize_datetime(updated_order)
-    return updated_order
+# @api_router.get("/internal-orders", response_model=List[InternalOrderRequisition])
+# async def get_internal_orders(status: Optional[InternalOrderStatus] = None):
+#     """Get all internal order requisitions, optionally filtered by status"""
+#     query = {}
+#     if status:
+#         query["status"] = status
+#     
+#     orders = await db.internal_orders.find(query, {"_id": 0}).to_list(1000)
+#     for order in orders:
+#         deserialize_datetime(order)
+#     return orders
 
 
 # ==================== MANAGER ROLE ENDPOINTS ====================
@@ -1440,9 +1282,9 @@ async def create_wheat_delivery(delivery: RawWheatDeliveryCreate):
 
 @api_router.get("/inventory-requests/manager-queue", response_model=List[InternalOrderRequisition])
 async def get_manager_queue():
-    """Fetches all internal order requisitions pending manager approval"""
-    orders = await db.internal_orders.find(
-        {"manager_approval_status": ManagerApprovalStatus.PENDING}, 
+    """Fetches all stock requests pending manager approval - NEW WORKFLOW"""
+    orders = await db.stock_requests.find(
+        {"status": InternalOrderStatus.PENDING_MANAGER_APPROVAL}, 
         {"_id": 0}
     ).to_list(1000)
     
@@ -1451,32 +1293,9 @@ async def get_manager_queue():
     return orders
 
 @api_router.post("/inventory-requests/{order_id}/approve")
-async def approve_inventory_request(order_id: str, approval: ManagerApproval):
-    """Sets manager approval status to approved for a specific request"""
-    order = await db.internal_orders.find_one({"id": order_id}, {"_id": 0})
-    if not order:
-        raise HTTPException(status_code=404, detail="Internal order not found")
-    
-    if order["manager_approval_status"] != ManagerApprovalStatus.PENDING:
-        raise HTTPException(status_code=400, detail="Order already reviewed by manager")
-    
-    update_data = {
-        "manager_approval_status": ManagerApprovalStatus.APPROVED
-    }
-    
-    await db.internal_orders.update_one({"id": order_id}, {"$set": update_data})
-    
-    # Create audit log
-    audit_log = AuditLog(
-        user=approval.approved_by,
-        action="approve_inventory_request_manager",
-        entity_type="internal_order",
-        entity_id=order_id,
-        details={"manager_approval": "approved"}
-    )
-    await db.audit_logs.insert_one(serialize_datetime(audit_log.model_dump()))
-    
-    return {"success": True, "message": "Request approved by manager"}
+async def approve_inventory_request(order_id: str, approval: ManagerApprovalAction):
+    """Legacy endpoint - redirects to new manager approval workflow"""
+    return await approve_stock_request_manager(order_id, approval)
 
 @api_router.post("/milling-orders", response_model=MillingOrder)
 async def create_milling_order(order: MillingOrderCreate):
@@ -1868,7 +1687,7 @@ async def create_stock_request(order: InternalOrderCreate):
         package_weight = order.quantity  # quantity is kg directly
         total_weight = order.quantity
     else:
-    total_weight = order.quantity * package_weight
+        total_weight = order.quantity * package_weight
     
     # Determine source branch automatically
     source_branch = await determine_source_branch(order.product_name)
@@ -1940,6 +1759,7 @@ async def create_inventory_request_sales(order: InternalOrderCreate):
 async def get_stock_requests(
     status: Optional[str] = None,
     branch_id: Optional[str] = None,
+    source_branch: Optional[str] = None,
     requested_by: Optional[str] = None
 ):
     """Get stock requests with optional filters"""
@@ -1948,6 +1768,8 @@ async def get_stock_requests(
         query["status"] = status
     if branch_id:
         query["branch_id"] = branch_id
+    if source_branch:
+        query["source_branch"] = source_branch
     if requested_by:
         query["requested_by"] = requested_by
     
@@ -3028,23 +2850,60 @@ def get_time_ago(timestamp):
 
 
 async def determine_source_branch(product_name: str):
-    """Determine which warehouse branch has the product"""
-    # Product-to-branch mapping
+    """Determine which branch produces the product"""
+    # Product-to-branch mapping based on ACTUAL production
     product_branch_map = {
-        "1st Quality": "main_warehouse",
-        "Bread Flour": "girmay_warehouse",
-        "White Fruskela": "main_warehouse",
-        "Red Fruskela": "girmay_warehouse",
-        "Furska": "main_warehouse"
+        # Girmay Branch produces:
+        "1st Quality": "girmay",      # All 1st Quality flour
+        
+        # Both branches produce Bread:
+        "Bread": "both",               # Check both branches
+        
+        # Both branches produce Fruska:
+        "Fruska": "both",              # Check both branches
+        
+        # Fruskelo Red - Both branches
+        "Fruskelo Red": "both",
+        
+        # Fruskelo White - Only Girmay
+        "Fruskelo White": "girmay",
+        
+        # TDF Service - Only Berhane
+        "TDF": "berhane"
     }
     
     # Check which product type it matches
     for product_type, branch in product_branch_map.items():
         if product_type in product_name:
-            return branch
+            if branch == "both":
+                # Check both branches for availability
+                # Try to find the product in database
+                product_berhane = await db.inventory.find_one({
+                    "name": product_name,
+                    "branch_id": "berhane"
+                }, {"_id": 0})
+                
+                product_girmay = await db.inventory.find_one({
+                    "name": product_name,
+                    "branch_id": "girmay"
+                }, {"_id": 0})
+                
+                # Return branch with higher stock
+                if product_berhane and product_girmay:
+                    return "berhane" if product_berhane.get("quantity", 0) > product_girmay.get("quantity", 0) else "girmay"
+                elif product_berhane:
+                    return "berhane"
+                elif product_girmay:
+                    return "girmay"
+            else:
+                return branch
     
-    # Default to checking both warehouses for availability
-    return "main_warehouse"
+    # Default: Check database for the product
+    product = await db.inventory.find_one({"name": product_name}, {"_id": 0})
+    if product:
+        return product.get("branch_id", "berhane")
+    
+    return "berhane"  # Default fallback
 
 
 async def reserve_inventory(product_name: str, source_branch: str, quantity_kg: float):
