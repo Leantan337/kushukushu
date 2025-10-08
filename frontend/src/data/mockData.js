@@ -111,7 +111,7 @@ export const mockData = {
       branch: "Girmay Branch",
       date: "2025-01-15",
       time: "14:30",
-      description: "ETB 150,000 difference between reported sales and actual cash received",
+      description: "Br 150,000 difference between reported sales and actual cash received",
       status: "New"
     },
     {
