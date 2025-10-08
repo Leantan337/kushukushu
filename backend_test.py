@@ -2,14 +2,16 @@
 """
 Backend API Testing for Wheat Flour Factory ERP
 Tests all backend endpoints for functionality, data persistence, and error handling.
+Focus on Sales Role & Transaction Workflow endpoints.
 """
 
 import requests
 import json
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 from pathlib import Path
+import uuid
 
 # Load environment variables to get the backend URL
 def load_env_file(file_path):
