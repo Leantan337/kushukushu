@@ -105,6 +105,18 @@
 user_problem_statement: "Revise wheat flour factory owner's dashboard with Ethiopian localization (Adigrat, ETB currency), enhance dashboard with profitability metrics and inventory levels, update ratio configuration to include waste percentage totaling 100%, create new Reports section for historical trends, and create User Management section for staff overview."
 
 backend:
+  - task: "Basic backend API endpoints (health check and status)"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Comprehensive testing completed. All basic API endpoints working correctly: GET /api/ (health check), POST /api/status (create status with client_name), GET /api/status (retrieve all status checks). CORS properly configured, data persistence verified with MongoDB, error handling working for invalid requests. 5/5 tests passed."
+
   - task: "Backend API endpoints for new dashboard metrics"
     implemented: false
     working: "NA"
