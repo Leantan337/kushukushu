@@ -308,6 +308,50 @@ class AuditLog(BaseModel):
     details: Dict
     ip_address: Optional[str] = None
 
+
+# Sales Models
+class SalesTransactionItem(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    product_id: str
+    product_name: str
+    quantity_kg: float
+    unit_price: float
+    total_price: float  # quantity_kg * unit_price
+
+class SalesTransaction(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    transaction_number: str
+    items: List[SalesTransactionItem]
+    total_amount: float
+    payment_type: PaymentType
+    status: TransactionStatus
+    sales_person_id: str
+    sales_person_name: str
+    branch_id: str
+    customer_id: Optional[str] = None  # Required for loan transactions
+    customer_name: Optional[str] = None
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class SalesTransactionCreate(BaseModel):
+    items: List[Dict]  # List of {product_id, product_name, quantity_kg, unit_price}
+    payment_type: PaymentType
+    sales_person_id: str
+    sales_person_name: str
+    branch_id: str
+    customer_id: Optional[str] = None
+    customer_name: Optional[str] = None
+
+class SalesReportQuery(BaseModel):
+    period: Optional[str] = "daily"  # daily, weekly, monthly
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    sales_person_id: Optional[str] = None
+
+
 # Helper function to serialize datetime fields
 def serialize_datetime(doc):
     if isinstance(doc, dict):
