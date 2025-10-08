@@ -102,7 +102,7 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-user_problem_statement: "Revise wheat flour factory owner's dashboard with Ethiopian localization (Adigrat, ETB currency), enhance dashboard with profitability metrics and inventory levels, update ratio configuration to include waste percentage totaling 100%, create new Reports section for historical trends, and create User Management section for staff overview."
+user_problem_statement: "Design and implement Inventory & Requisition Management Screens: 1) Inventory Management - central hub for viewing and managing physical stock with transaction history and manual stock adjustments (requires approval), 2) Purchase Requisitions - request approval workflow (Manager → Admin → Owner) for purchasing goods/services with status tracking, 3) Internal Order Requisitions - flour request system for Sales team with Store Keeper fulfillment (auto-deduct inventory)"
 
 backend:
   - task: "Basic backend API endpoints (health check and status)"
@@ -117,32 +117,65 @@ backend:
         agent: "testing"
         comment: "Comprehensive testing completed. All basic API endpoints working correctly: GET /api/ (health check), POST /api/status (create status with client_name), GET /api/status (retrieve all status checks). CORS properly configured, data persistence verified with MongoDB, error handling working for invalid requests. 5/5 tests passed."
 
-  - task: "Backend API endpoints for new dashboard metrics"
-    implemented: false
+  - task: "Inventory Management API endpoints"
+    implemented: true
     working: "NA"
     file: "server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
-    status_history: []
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Implemented complete inventory management system with endpoints: GET/POST /api/inventory (list and create items), GET /api/inventory/{id} (item details with transaction history), POST /api/inventory/{id}/transaction (add transactions), stock level calculation (ok/low/critical), and audit logging. Database seeded with 5 inventory items (Raw Wheat, 1st Quality Flour, Bread Flour, Fruska, Fruskelo)"
 
-  - task: "Backend API for reports functionality"
-    implemented: false
+  - task: "Stock Adjustment Request API endpoints"
+    implemented: true
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Implemented stock adjustment workflow requiring Manager/Owner approval. Endpoints: GET/POST /api/stock-adjustments (list and create requests), PUT /api/stock-adjustments/{id}/review (approve/reject). Auto-applies adjustment to inventory upon approval with audit logging"
+
+  - task: "Purchase Requisition API endpoints"
+    implemented: true
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Implemented 3-level approval workflow (Manager → Admin → Owner). Endpoints: GET/POST /api/purchase-requisitions, GET /api/purchase-requisitions/{id}, PUT /api/purchase-requisitions/{id}/approve-manager|admin|owner, PUT /api/purchase-requisitions/{id}/reject, PUT /api/purchase-requisitions/{id}/mark-purchased. Full approval chain tracking with notes. Database seeded with 2 sample requisitions"
+
+  - task: "Internal Order Requisition API endpoints"
+    implemented: true
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Implemented flour request system with auto-deduction from inventory. Endpoints: GET/POST /api/internal-orders, GET /api/internal-orders/{id}, PUT /api/internal-orders/{id}/approve (Manager/Admin), PUT /api/internal-orders/{id}/fulfill (Store Keeper - auto-deducts from inventory), PUT /api/internal-orders/{id}/reject. Workflow: Pending → Approved → Fulfilled. Database seeded with 2 sample orders"
+
+  - task: "Audit Log API endpoints"
+    implemented: true
     working: "NA"
     file: "server.py"
     stuck_count: 0
     priority: "medium"
-    needs_retesting: false
-    status_history: []
-
-  - task: "Backend API for user management"
-    implemented: false
-    working: "NA"
-    file: "server.py"
-    stuck_count: 0
-    priority: "medium"
-    needs_retesting: false
-    status_history: []
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Implemented comprehensive audit logging for all inventory and requisition operations. Endpoint: GET /api/audit-logs with filters for entity_type, user, and limit. All create/update/approve/reject actions are logged"
 
 frontend:
   - task: "Update localization from Nigerian to Ethiopian (currency, locations)"
