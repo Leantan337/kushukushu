@@ -22,7 +22,7 @@ const WheatDeliveryForm = ({ manager, onSuccess, onCancel }) => {
     setMessage({ type: '', text: '' });
 
     try {
-      const backendUrl = import.meta.env.REACT_APP_BACKEND_URL || process.env.REACT_APP_BACKEND_URL;
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
       
       const deliveryData = {
         supplier_name: formData.supplier_name,
