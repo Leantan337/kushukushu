@@ -6,6 +6,7 @@ import OwnerDashboard from "./components/owner/OwnerDashboard";
 import RatioConfiguration from "./components/owner/RatioConfiguration";
 import ApprovalsScreen from "./components/owner/ApprovalsScreen";
 import AlertsScreen from "./components/owner/AlertsScreen";
+import { Toaster } from "./components/ui/toaster";
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
           <Route path="/alerts" element={<AlertsScreen />} />
         </Routes>
       </BrowserRouter>
+      <Toaster />
     </div>
   );
 }
