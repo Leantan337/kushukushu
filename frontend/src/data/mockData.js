@@ -1,9 +1,17 @@
 export const mockData = {
   dashboard: {
-    dailySales: "₦2,350,000",
-    cashInBank: "₦45,230,000",
+    dailySales: "ETB 2,350,000",
+    cashInBank: "ETB 45,230,000",
+    grossProfit: "ETB 1,180,000",
+    netProfit: "ETB 890,000",
     totalProduction: "8,500kg",
     activeStaff: "24",
+    outstandingReceivables: "ETB 3,240,000",
+    inventoryLevels: {
+      rawWheat: "12,500kg",
+      finishedFlour: "8,200kg",
+      fruska: "2,300kg"
+    },
     weeklyProduction: [
       { day: "Monday", amount: 850 },
       { day: "Tuesday", amount: 920 },
@@ -18,14 +26,14 @@ export const mockData = {
         name: "Berhane Branch",
         status: "Active",
         production: "4,200kg",
-        sales: "₦1,240,000",
+        sales: "ETB 1,240,000",
         efficiency: "92%"
       },
       {
         name: "Girmay Branch", 
         status: "Active",
         production: "4,300kg",
-        sales: "₦1,110,000",
+        sales: "ETB 1,110,000",
         efficiency: "89%"
       }
     ]
