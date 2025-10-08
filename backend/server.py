@@ -223,6 +223,60 @@ class InternalOrderRejection(BaseModel):
 class InternalOrderFulfillment(BaseModel):
     fulfilled_by: str
 
+class ManagerApproval(BaseModel):
+    approved_by: str
+
+
+# Manager Role Models
+class RawWheatDelivery(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    supplier_name: str
+    quantity_kg: float
+    quality_rating: QualityRating
+    manager_id: str
+    branch_id: str
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class RawWheatDeliveryCreate(BaseModel):
+    supplier_name: str
+    quantity_kg: float
+    quality_rating: QualityRating
+    manager_id: str
+    branch_id: str
+
+class MillingOrder(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    status: MillingOrderStatus = MillingOrderStatus.PENDING
+    raw_wheat_input_kg: float
+    manager_id: str
+    branch_id: str
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class MillingOrderCreate(BaseModel):
+    raw_wheat_input_kg: float
+    manager_id: str
+    branch_id: str
+
+class MillingOrderOutput(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    milling_order_id: str
+    product_id: str
+    product_name: str
+    output_quantity_kg: float
+
+class MillingOrderOutputCreate(BaseModel):
+    product_id: str
+    quantity: float
+
+class MillingOrderCompletion(BaseModel):
+    outputs: List[MillingOrderOutputCreate]
+
 
 # Audit Log Model
 class AuditLog(BaseModel):
