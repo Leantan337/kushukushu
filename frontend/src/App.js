@@ -15,6 +15,7 @@ import PurchaseRequisitions from "./components/requisitions/PurchaseRequisitions
 import InternalOrderRequisitions from "./components/requisitions/InternalOrderRequisitions";
 import ManagerDashboard from "./components/manager/ManagerDashboard";
 import SalesDashboard from "./components/sales/SalesDashboard";
+import StoreKeeperDashboard from "./components/storekeeper/StoreKeeperDashboard";
 import { Toaster } from "./components/ui/toaster";
 
 function App() {
