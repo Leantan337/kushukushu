@@ -6,7 +6,7 @@ import { Label } from "../ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { Textarea } from "../ui/textarea";
 import { Package, Send } from "lucide-react";
-import { useToast } from "../ui/use-toast";
+import { useToast } from "../../hooks/use-toast";
 
 const InventoryRequestForm = () => {
   const { toast } = useToast();
