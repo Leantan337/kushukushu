@@ -1539,7 +1539,7 @@ async def get_sales_report(
         query["timestamp"] = {"$gte": today, "$lt": tomorrow}
     elif period == "weekly":
         # Last 7 days
-        week_ago = datetime.now(timezone.utc) - datetime.timedelta(days=7)
+        week_ago = datetime.now(timezone.utc) - timedelta(days=7)
         query["timestamp"] = {"$gte": week_ago}
     elif period == "monthly":
         # Current month
