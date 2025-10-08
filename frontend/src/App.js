@@ -24,6 +24,8 @@ function App() {
           <Route path="/ratio-config" element={<RatioConfiguration />} />
           <Route path="/approvals" element={<ApprovalsScreen />} />
           <Route path="/alerts" element={<AlertsScreen />} />
+          <Route path="/reports" element={<ReportsScreen />} />
+          <Route path="/user-management" element={<UserManagementScreen />} />
           
           {/* Admin Routes (Web) */}
           <Route path="/admin" element={<AdminLogin />} />
