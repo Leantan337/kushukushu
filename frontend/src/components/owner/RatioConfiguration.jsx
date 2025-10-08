@@ -212,6 +212,23 @@ const RatioConfiguration = () => {
                     step="0.1"
                   />
                 </div>
+
+                {/* Waste Ratio */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <Label className="text-slate-700 font-medium">Waste (%)</Label>
+                    <span className="text-sm font-semibold text-slate-900">{ratios.waste}%</span>
+                  </div>
+                  <Input
+                    type="number"
+                    value={ratios.waste}
+                    onChange={(e) => handleRatioChange('waste', e.target.value)}
+                    className="h-12 border-slate-200"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                  />
+                </div>
               </div>
 
               {/* Total Validation */}
