@@ -177,6 +177,42 @@ backend:
         agent: "main"
         comment: "Implemented comprehensive audit logging for all inventory and requisition operations. Endpoint: GET /api/audit-logs with filters for entity_type, user, and limit. All create/update/approve/reject actions are logged"
 
+  - task: "Manager Role - Raw Wheat Deliveries API"
+    implemented: true
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Implemented POST /api/wheat-deliveries endpoint. Creates RawWheatDeliveries records with supplier info, quantity, quality rating, manager/branch IDs. Auto-updates Raw Wheat inventory stock with transaction logging and audit trails."
+
+  - task: "Manager Role - Manager Queue for Internal Orders"
+    implemented: true
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Added manager_approval_status field to InternalOrderRequisition model. Implemented GET /api/inventory-requests/manager-queue (pending manager approval) and POST /api/inventory-requests/{id}/approve (manager approval). Maintains existing workflow with additional manager approval layer."
+
+  - task: "Manager Role - Milling Orders API"
+    implemented: true
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Implemented POST /api/milling-orders (creates order, deducts raw wheat) and POST /api/milling-orders/{id}/complete (records outputs, adds finished products to inventory). Includes stock validation, auto-inventory updates, and comprehensive audit logging for production workflow."
+
 frontend:
   - task: "Update localization from Nigerian to Ethiopian (currency, locations)"
     implemented: true
