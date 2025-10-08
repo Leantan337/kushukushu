@@ -13,6 +13,7 @@ import UserManagement from "./components/admin/UserManagement";
 import InventoryManagement from "./components/inventory/InventoryManagement";
 import PurchaseRequisitions from "./components/requisitions/PurchaseRequisitions";
 import InternalOrderRequisitions from "./components/requisitions/InternalOrderRequisitions";
+import ManagerDashboard from "./components/manager/ManagerDashboard";
 import { Toaster } from "./components/ui/toaster";
 
 function App() {
