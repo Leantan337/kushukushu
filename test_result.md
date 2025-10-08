@@ -365,11 +365,7 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus:
-    - "Sales Role - Point of Sale (POS) Transaction API"
-    - "Sales Role - Inventory Request API"
-    - "Sales Role - Purchase Request API"
-    - "Sales Role - Sales Reports API"
+  current_focus: []
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
