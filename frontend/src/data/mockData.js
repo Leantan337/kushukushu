@@ -62,17 +62,17 @@ export const mockData = {
       id: 1,
       type: "Payment",
       title: "Supplier Payment - Premium Wheat",
-      amount: "₦8,500,000",
+      amount: "ETB 8,500,000",
       requestedBy: "Finance Team",
       date: "2025-01-15",
       priority: "High",
-      description: "Payment for 500 tons of premium wheat from Kaduna supplier"
+      description: "Payment for 500 tons of premium wheat from Adigrat supplier"
     },
     {
       id: 2,
       type: "Purchase",
       title: "New Milling Equipment",
-      amount: "₦25,000,000",
+      amount: "ETB 25,000,000",
       requestedBy: "Manager - Berhane",
       date: "2025-01-14",
       priority: "Medium",
@@ -82,21 +82,21 @@ export const mockData = {
       id: 3,
       type: "Contract",
       title: "Bulk Sales Contract",
-      amount: "₦15,200,000",
+      amount: "ETB 15,200,000",
       requestedBy: "Sales Team",
       date: "2025-01-13",
       priority: "High",
-      description: "6-month supply contract with major distributor in Lagos"
+      description: "6-month supply contract with major distributor in Tigray region"
     },
     {
       id: 4,
       type: "Expense",
       title: "Facility Maintenance",
-      amount: "₦3,800,000",
+      amount: "ETB 3,800,000",
       requestedBy: "Admin Team",
       date: "2025-01-12",
       priority: "Low",
-      description: "Quarterly maintenance for both factory locations"
+      description: "Quarterly maintenance for both factory locations in Adigrat"
     }
   ],
 
