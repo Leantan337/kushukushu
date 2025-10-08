@@ -215,15 +215,18 @@ backend:
 
   - task: "Sales Role - Point of Sale (POS) Transaction API"
     implemented: true
-    working: "NA"
+    working: true
     file: "server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: true
         agent: "main"
         comment: "Implemented POST /api/sales-transactions endpoint with comprehensive POS functionality. Automatically deducts inventory, handles cash/check/transfer/loan payments, tracks unpaid status for loans with customer info, validates stock levels, includes transaction items with pricing, and comprehensive audit logging."
+      - working: true
+        agent: "testing"
+        comment: "Comprehensive testing completed successfully. All payment types working correctly: cash/check/transfer payments marked as 'paid', loan payments marked as 'unpaid' with customer info requirement. Inventory automatically deducted (verified 1st Quality Flour: 10,000kg → 9,150kg, Bread Flour: 8,000kg → 7,950kg). Stock validation working (insufficient stock returns 400 error). Non-existent product validation working (returns 404 error). Customer info validation for loans working (returns 400 error when missing). Transaction numbering sequential (TXN-000001, TXN-000002, etc.). All acceptance criteria met."
 
   - task: "Sales Role - Inventory Request API"
     implemented: true
