@@ -109,7 +109,7 @@ export const mockData = {
       branch: "Girmay Branch",
       date: "2025-01-15",
       time: "14:30",
-      description: "₦150,000 difference between reported sales and actual cash received",
+      description: "ETB 150,000 difference between reported sales and actual cash received",
       status: "New"
     },
     {
@@ -153,8 +153,94 @@ export const mockData = {
       branch: "Both Branches",
       date: "2025-01-13",
       time: "11:30",
-      description: "₦2,000,000 cash withdrawal without prior owner approval",
+      description: "ETB 2,000,000 cash withdrawal without prior owner approval",
       status: "Resolved"
+    }
+  ],
+
+  // New mock data for reports
+  reports: {
+    salesTrends: [
+      { month: "Jul 2024", sales: 52000000, target: 50000000 },
+      { month: "Aug 2024", sales: 48000000, target: 52000000 },
+      { month: "Sep 2024", sales: 55000000, target: 53000000 },
+      { month: "Oct 2024", sales: 59000000, target: 55000000 },
+      { month: "Nov 2024", sales: 62000000, target: 58000000 },
+      { month: "Dec 2024", sales: 58000000, target: 60000000 }
+    ],
+    productionTrends: [
+      { month: "Jul 2024", production: 180000, efficiency: 89 },
+      { month: "Aug 2024", production: 175000, efficiency: 87 },
+      { month: "Sep 2024", production: 190000, efficiency: 91 },
+      { month: "Oct 2024", production: 195000, efficiency: 93 },
+      { month: "Nov 2024", production: 200000, efficiency: 94 },
+      { month: "Dec 2024", production: 185000, efficiency: 90 }
+    ],
+    profitLoss: [
+      { month: "Jul 2024", revenue: 52000000, costs: 38000000, profit: 14000000 },
+      { month: "Aug 2024", revenue: 48000000, costs: 36000000, profit: 12000000 },
+      { month: "Sep 2024", revenue: 55000000, costs: 40000000, profit: 15000000 },
+      { month: "Oct 2024", revenue: 59000000, costs: 42000000, profit: 17000000 },
+      { month: "Nov 2024", revenue: 62000000, costs: 44000000, profit: 18000000 },
+      { month: "Dec 2024", revenue: 58000000, costs: 41000000, profit: 17000000 }
+    ],
+    customerCredits: [
+      { customer: "Habesha Bakery", amount: 850000, daysOverdue: 15 },
+      { customer: "Mekelle Distribution", amount: 1200000, daysOverdue: 8 },
+      { customer: "Tigray Wholesale", amount: 680000, daysOverdue: 22 },
+      { customer: "Adigrat Retailers", amount: 510000, daysOverdue: 5 }
+    ]
+  },
+
+  // Mock data for user management
+  users: [
+    {
+      id: 1,
+      name: "Tekle Gebremedhin",
+      role: "Branch Manager",
+      branch: "Berhane Branch",
+      lastActivity: "2025-01-15 16:30",
+      status: "Active"
+    },
+    {
+      id: 2,
+      name: "Hiwet Alem",
+      role: "Sales Team Lead",
+      branch: "Girmay Branch",
+      lastActivity: "2025-01-15 17:15",
+      status: "Active"
+    },
+    {
+      id: 3,
+      name: "Berhe Kidane",
+      role: "Store Keeper",
+      branch: "Berhane Branch",
+      lastActivity: "2025-01-15 15:45",
+      status: "Active"
+    },
+    {
+      id: 4,
+      name: "Marta Hailu",
+      role: "Finance Officer",
+      branch: "Both Branches",
+      lastActivity: "2025-01-15 18:00",
+      status: "Active"
+    },
+    {
+      id: 5,
+      name: "Gebre Yohannes",
+      role: "Sales Person",
+      branch: "Girmay Branch",
+      lastActivity: "2025-01-14 14:20",
+      status: "Inactive"
+    },
+    {
+      id: 6,
+      name: "Tsehay Meles",
+      role: "Production Supervisor",
+      branch: "Berhane Branch",
+      lastActivity: "2025-01-15 16:50",
+      status: "Active"
     }
   ]
 };
