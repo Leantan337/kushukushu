@@ -67,6 +67,7 @@ function App() {
           <Route path="/storekeeper/dashboard" element={<StoreKeeperDashboard />} />
           
           {/* Demo Routes for Client Presentation */}
+          <Route path="/demo" element={<DemoLanding />} />
           <Route path="/demo/pos" element={<SimplePOS />} />
           <Route path="/demo/inventory" element={<SimpleInventoryDashboard />} />
           <Route path="/demo/sales" element={<SimpleSalesDashboard />} />
