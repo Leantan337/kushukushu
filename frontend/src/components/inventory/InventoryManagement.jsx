@@ -36,7 +36,7 @@ const InventoryManagement = ({ userRole = "store_keeper" }) => {
 
   const fetchInventory = async () => {
     try {
-      const backendUrl = import.meta.env.REACT_APP_BACKEND_URL || process.env.REACT_APP_BACKEND_URL;
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
       const response = await fetch(`${backendUrl}/inventory`);
       if (response.ok) {
         const data = await response.json();
@@ -147,7 +147,7 @@ const InventoryManagement = ({ userRole = "store_keeper" }) => {
 
     setLoading(true);
     try {
-      const backendUrl = import.meta.env.REACT_APP_BACKEND_URL || process.env.REACT_APP_BACKEND_URL;
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
       const response = await fetch(`${backendUrl}/stock-adjustments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
