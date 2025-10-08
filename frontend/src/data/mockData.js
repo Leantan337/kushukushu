@@ -1,12 +1,12 @@
 export const mockData = {
   dashboard: {
-    dailySales: "ETB 2,350,000",
-    cashInBank: "ETB 45,230,000",
-    grossProfit: "ETB 1,180,000",
-    netProfit: "ETB 890,000",
+    dailySales: "Br 2,350,000",
+    cashInBank: "Br 45,230,000",
+    grossProfit: "Br 1,180,000",
+    netProfit: "Br 890,000",
     totalProduction: "8,500kg",
     activeStaff: "24",
-    outstandingReceivables: "ETB 3,240,000",
+    outstandingReceivables: "Br 3,240,000",
     inventoryLevels: {
       rawWheat: "12,500kg",
       finishedFlour: "8,200kg",
@@ -26,15 +26,17 @@ export const mockData = {
         name: "Berhane Branch",
         status: "Active",
         production: "4,200kg",
-        sales: "ETB 1,240,000",
-        efficiency: "92%"
+        sales: "Br 1,240,000",
+        efficiency: "92%",
+        inventory: "8,200kg"
       },
       {
         name: "Girmay Branch", 
         status: "Active",
         production: "4,300kg",
-        sales: "ETB 1,110,000",
-        efficiency: "89%"
+        sales: "Br 1,110,000",
+        efficiency: "89%",
+        inventory: "7,800kg"
       }
     ]
   },
