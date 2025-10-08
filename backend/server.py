@@ -391,6 +391,18 @@ def calculate_stock_level(quantity: float, low_threshold: float, critical_thresh
         return StockLevel.LOW
     return StockLevel.OK
 
+# Helper function for audit logging
+async def log_audit(user: str, action: str, entity_type: str, entity_id: str, details: dict):
+    """Create an audit log entry"""
+    audit_log = AuditLog(
+        user=user,
+        action=action,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        details=details
+    )
+    await db.audit_logs.insert_one(serialize_datetime(audit_log.model_dump()))
+
 
 # Add your routes to the router instead of directly to app
 @api_router.get("/")
