@@ -35,6 +35,20 @@ function App() {
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
           <Route path="/admin/users" element={<UserManagement />} />
           
+          {/* Inventory & Requisitions Routes */}
+          <Route path="/inventory" element={<InventoryManagement userRole="store_keeper" />} />
+          <Route path="/inventory/manager" element={<InventoryManagement userRole="manager" />} />
+          <Route path="/inventory/owner" element={<InventoryManagement userRole="owner" />} />
+          <Route path="/inventory/admin" element={<InventoryManagement userRole="admin" />} />
+          
+          <Route path="/purchase-requisitions" element={<PurchaseRequisitions userRole="manager" />} />
+          <Route path="/purchase-requisitions/admin" element={<PurchaseRequisitions userRole="admin" />} />
+          <Route path="/purchase-requisitions/owner" element={<PurchaseRequisitions userRole="owner" />} />
+          
+          <Route path="/internal-orders" element={<InternalOrderRequisitions userRole="sales" />} />
+          <Route path="/internal-orders/store-keeper" element={<InternalOrderRequisitions userRole="store_keeper" />} />
+          <Route path="/internal-orders/manager" element={<InternalOrderRequisitions userRole="manager" />} />
+          
           {/* Placeholder routes for other roles */}
           <Route path="/finance/dashboard" element={<div className="p-8 text-center"><h1 className="text-2xl font-bold">Finance Dashboard - Coming Soon</h1></div>} />
           <Route path="/manager/dashboard" element={<div className="p-8 text-center"><h1 className="text-2xl font-bold">Manager Dashboard - Coming Soon</h1></div>} />
