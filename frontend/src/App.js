@@ -6,6 +6,8 @@ import OwnerDashboard from "./components/owner/OwnerDashboard";
 import RatioConfiguration from "./components/owner/RatioConfiguration";
 import ApprovalsScreen from "./components/owner/ApprovalsScreen";
 import AlertsScreen from "./components/owner/AlertsScreen";
+import ReportsScreen from "./components/owner/ReportsScreen";
+import UserManagementScreen from "./components/owner/UserManagementScreen";
 import AdminLogin from "./components/admin/AdminLogin";
 import AdminDashboard from "./components/admin/AdminDashboard";
 import UserManagement from "./components/admin/UserManagement";
