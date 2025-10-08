@@ -994,6 +994,197 @@ async def reject_internal_order(order_id: str, rejection: InternalOrderRejection
     return updated_order
 
 
+# ==================== MANAGER ROLE ENDPOINTS ====================
+
+@api_router.post("/wheat-deliveries", response_model=RawWheatDelivery)
+async def create_wheat_delivery(delivery: RawWheatDeliveryCreate):
+    """Creates a new raw wheat delivery record"""
+    # Create the delivery record
+    wheat_delivery = RawWheatDelivery(**delivery.model_dump())
+    
+    doc = wheat_delivery.model_dump()
+    serialize_datetime(doc)
+    
+    await db.raw_wheat_deliveries.insert_one(doc)
+    
+    # Find Raw Wheat inventory item and update stock
+    raw_wheat_item = await db.inventory.find_one({"name": "Raw Wheat"}, {"_id": 0})
+    if raw_wheat_item:
+        # Add inventory transaction
+        await add_inventory_transaction(
+            raw_wheat_item["id"],
+            "in",
+            delivery.quantity_kg,
+            f"Wheat Delivery from {delivery.supplier_name}",
+            delivery.manager_id
+        )
+    
+    # Create audit log
+    audit_log = AuditLog(
+        user=delivery.manager_id,
+        action="create_wheat_delivery",
+        entity_type="wheat_delivery",
+        entity_id=wheat_delivery.id,
+        details={
+            "supplier_name": delivery.supplier_name,
+            "quantity_kg": delivery.quantity_kg,
+            "quality_rating": delivery.quality_rating,
+            "branch_id": delivery.branch_id
+        }
+    )
+    await db.audit_logs.insert_one(serialize_datetime(audit_log.model_dump()))
+    
+    return wheat_delivery
+
+@api_router.get("/inventory-requests/manager-queue", response_model=List[InternalOrderRequisition])
+async def get_manager_queue():
+    """Fetches all internal order requisitions pending manager approval"""
+    orders = await db.internal_orders.find(
+        {"manager_approval_status": ManagerApprovalStatus.PENDING}, 
+        {"_id": 0}
+    ).to_list(1000)
+    
+    for order in orders:
+        deserialize_datetime(order)
+    return orders
+
+@api_router.post("/inventory-requests/{order_id}/approve")
+async def approve_inventory_request(order_id: str, approval: ManagerApproval):
+    """Sets manager approval status to approved for a specific request"""
+    order = await db.internal_orders.find_one({"id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Internal order not found")
+    
+    if order["manager_approval_status"] != ManagerApprovalStatus.PENDING:
+        raise HTTPException(status_code=400, detail="Order already reviewed by manager")
+    
+    update_data = {
+        "manager_approval_status": ManagerApprovalStatus.APPROVED
+    }
+    
+    await db.internal_orders.update_one({"id": order_id}, {"$set": update_data})
+    
+    # Create audit log
+    audit_log = AuditLog(
+        user=approval.approved_by,
+        action="approve_inventory_request_manager",
+        entity_type="internal_order",
+        entity_id=order_id,
+        details={"manager_approval": "approved"}
+    )
+    await db.audit_logs.insert_one(serialize_datetime(audit_log.model_dump()))
+    
+    return {"success": True, "message": "Request approved by manager"}
+
+@api_router.post("/milling-orders", response_model=MillingOrder)
+async def create_milling_order(order: MillingOrderCreate):
+    """Creates a new milling order and deducts raw wheat from inventory"""
+    # Check if there's enough raw wheat in inventory
+    raw_wheat_item = await db.inventory.find_one({"name": "Raw Wheat"}, {"_id": 0})
+    if not raw_wheat_item:
+        raise HTTPException(status_code=404, detail="Raw Wheat inventory item not found")
+    
+    if raw_wheat_item["quantity"] < order.raw_wheat_input_kg:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Insufficient raw wheat. Available: {raw_wheat_item['quantity']}kg, Required: {order.raw_wheat_input_kg}kg"
+        )
+    
+    # Create the milling order
+    milling_order = MillingOrder(**order.model_dump())
+    
+    doc = milling_order.model_dump()
+    serialize_datetime(doc)
+    
+    await db.milling_orders.insert_one(doc)
+    
+    # Deduct raw wheat from inventory
+    await add_inventory_transaction(
+        raw_wheat_item["id"],
+        "out",
+        order.raw_wheat_input_kg,
+        f"Milling Order {milling_order.id[:8]}",
+        order.manager_id
+    )
+    
+    # Create audit log
+    audit_log = AuditLog(
+        user=order.manager_id,
+        action="create_milling_order",
+        entity_type="milling_order",
+        entity_id=milling_order.id,
+        details={
+            "raw_wheat_input_kg": order.raw_wheat_input_kg,
+            "branch_id": order.branch_id
+        }
+    )
+    await db.audit_logs.insert_one(serialize_datetime(audit_log.model_dump()))
+    
+    return milling_order
+
+@api_router.post("/milling-orders/{order_id}/complete")
+async def complete_milling_order(order_id: str, completion: MillingOrderCompletion):
+    """Completes milling order and adds finished products to inventory"""
+    # Find the milling order
+    milling_order = await db.milling_orders.find_one({"id": order_id}, {"_id": 0})
+    if not milling_order:
+        raise HTTPException(status_code=404, detail="Milling order not found")
+    
+    if milling_order["status"] != MillingOrderStatus.PENDING:
+        raise HTTPException(status_code=400, detail="Milling order is not in pending status")
+    
+    # Process each output product
+    output_records = []
+    for output in completion.outputs:
+        # Find the product in inventory
+        product_item = await db.inventory.find_one({"id": output.product_id}, {"_id": 0})
+        if not product_item:
+            raise HTTPException(status_code=404, detail=f"Product with ID {output.product_id} not found")
+        
+        # Add to inventory
+        await add_inventory_transaction(
+            output.product_id,
+            "in",
+            output.quantity,
+            f"Milling Order Output {order_id[:8]}",
+            milling_order["manager_id"]
+        )
+        
+        # Create output record
+        output_record = MillingOrderOutput(
+            milling_order_id=order_id,
+            product_id=output.product_id,
+            product_name=product_item["name"],
+            output_quantity_kg=output.quantity
+        )
+        output_records.append(output_record.model_dump())
+    
+    # Store output records
+    if output_records:
+        serialized_outputs = [serialize_datetime(record) for record in output_records]
+        await db.milling_order_outputs.insert_many(serialized_outputs)
+    
+    # Update milling order status to completed
+    await db.milling_orders.update_one(
+        {"id": order_id},
+        {"$set": {"status": MillingOrderStatus.COMPLETED}}
+    )
+    
+    # Create audit log
+    audit_log = AuditLog(
+        user=milling_order["manager_id"],
+        action="complete_milling_order",
+        entity_type="milling_order",
+        entity_id=order_id,
+        details={
+            "outputs": [{"product_id": o.product_id, "quantity": o.quantity} for o in completion.outputs]
+        }
+    )
+    await db.audit_logs.insert_one(serialize_datetime(audit_log.model_dump()))
+    
+    return {"success": True, "message": "Milling order completed successfully", "outputs": len(completion.outputs)}
+
+
 # ==================== AUDIT LOG ENDPOINTS ====================
 
 @api_router.get("/audit-logs", response_model=List[AuditLog])
