@@ -354,9 +354,10 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Update localization from Nigerian to Ethiopian"
-    - "Enhance owner dashboard with profitability and inventory widgets"
-    - "Update ratio configuration to include waste percentage"
+    - "Sales Role - Point of Sale (POS) Transaction API"
+    - "Sales Role - Inventory Request API"
+    - "Sales Role - Purchase Request API"
+    - "Sales Role - Sales Reports API"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
