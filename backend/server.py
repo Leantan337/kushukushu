@@ -68,6 +68,23 @@ class QualityRating(str, Enum):
     AVERAGE = "average"
     POOR = "poor"
 
+class PaymentType(str, Enum):
+    CASH = "cash"
+    CHECK = "check"
+    TRANSFER = "transfer"
+    LOAN = "loan"
+
+class TransactionStatus(str, Enum):
+    PAID = "paid"
+    UNPAID = "unpaid"
+
+class UserRole(str, Enum):
+    SALES = "sales"
+    MANAGER = "manager"
+    ADMIN = "admin"
+    OWNER = "owner"
+    STORE_KEEPER = "store_keeper"
+
 
 # Define Models
 class StatusCheck(BaseModel):
