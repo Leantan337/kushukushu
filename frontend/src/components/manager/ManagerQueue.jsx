@@ -25,7 +25,7 @@ const ManagerQueue = ({ manager, onSuccess }) => {
 
   const fetchPendingOrders = async () => {
     try {
-      const backendUrl = import.meta.env.REACT_APP_BACKEND_URL || process.env.REACT_APP_BACKEND_URL;
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
       const response = await fetch(`${backendUrl}/inventory-requests/manager-queue`);
       
       if (response.ok) {
@@ -69,7 +69,7 @@ const ManagerQueue = ({ manager, onSuccess }) => {
     setMessage({ type: '', text: '' });
 
     try {
-      const backendUrl = import.meta.env.REACT_APP_BACKEND_URL || process.env.REACT_APP_BACKEND_URL;
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
       const response = await fetch(`${backendUrl}/inventory-requests/${orderId}/approve`, {
         method: 'POST',
         headers: {
