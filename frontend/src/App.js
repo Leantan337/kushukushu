@@ -50,9 +50,11 @@ function App() {
           <Route path="/internal-orders/store-keeper" element={<InternalOrderRequisitions userRole="store_keeper" />} />
           <Route path="/internal-orders/manager" element={<InternalOrderRequisitions userRole="manager" />} />
           
+          {/* Manager Routes */}
+          <Route path="/manager/dashboard" element={<ManagerDashboard />} />
+          
           {/* Placeholder routes for other roles */}
           <Route path="/finance/dashboard" element={<div className="p-8 text-center"><h1 className="text-2xl font-bold">Finance Dashboard - Coming Soon</h1></div>} />
-          <Route path="/manager/dashboard" element={<div className="p-8 text-center"><h1 className="text-2xl font-bold">Manager Dashboard - Coming Soon</h1></div>} />
           <Route path="/sales/dashboard" element={<div className="p-8 text-center"><h1 className="text-2xl font-bold">Sales Dashboard - Coming Soon</h1></div>} />
           <Route path="/storekeeper/dashboard" element={<div className="p-8 text-center"><h1 className="text-2xl font-bold">Store Keeper Dashboard - Coming Soon</h1></div>} />
         </Routes>
