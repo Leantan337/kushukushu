@@ -10,6 +10,9 @@ import ReportsScreen from "./components/owner/ReportsScreen";
 import UserManagementScreen from "./components/owner/UserManagementScreen";
 import AdminDashboard from "./components/admin/AdminDashboard";
 import UserManagement from "./components/admin/UserManagement";
+import InventoryManagement from "./components/inventory/InventoryManagement";
+import PurchaseRequisitions from "./components/requisitions/PurchaseRequisitions";
+import InternalOrderRequisitions from "./components/requisitions/InternalOrderRequisitions";
 import { Toaster } from "./components/ui/toaster";
 
 function App() {
