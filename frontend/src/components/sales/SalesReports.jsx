@@ -4,7 +4,7 @@ import { Button } from "../ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { Label } from "../ui/label";
 import { TrendingUp, DollarSign, ShoppingCart, CreditCard, Package } from "lucide-react";
-import { useToast } from "../ui/use-toast";
+import { useToast } from "../../hooks/use-toast";
 
 const SalesReports = () => {
   const { toast } = useToast();
