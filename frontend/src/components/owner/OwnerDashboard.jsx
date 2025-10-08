@@ -129,6 +129,72 @@ const OwnerDashboard = () => {
             color="bg-blue-600"
           />
           <StatCard
+            title="Gross Profit"
+            value={mockData.dashboard.grossProfit}
+            change="+8%"
+            trend="up"
+            icon={DollarSign}
+            color="bg-emerald-600"
+          />
+          <StatCard
+            title="Net Profit"
+            value={mockData.dashboard.netProfit}
+            change="+6%"
+            trend="up"
+            icon={TrendingUp}
+            color="bg-teal-600"
+          />
+        </div>
+
+        {/* Inventory and Receivables */}
+        <div className="grid grid-cols-2 gap-4">
+          <Card className="bg-white shadow-sm border-slate-200">
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold text-slate-900 flex items-center">
+                <Package className="w-5 h-5 mr-2" />
+                Key Inventory Levels
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex justify-between items-center p-2 bg-amber-50 rounded-lg">
+                <span className="text-sm font-medium text-amber-800">Raw Wheat</span>
+                <span className="font-semibold text-amber-900">{mockData.dashboard.inventoryLevels.rawWheat}</span>
+              </div>
+              <div className="flex justify-between items-center p-2 bg-blue-50 rounded-lg">
+                <span className="text-sm font-medium text-blue-800">Finished Flour</span>
+                <span className="font-semibold text-blue-900">{mockData.dashboard.inventoryLevels.finishedFlour}</span>
+              </div>
+              <div className="flex justify-between items-center p-2 bg-purple-50 rounded-lg">
+                <span className="text-sm font-medium text-purple-800">Fruska</span>
+                <span className="font-semibold text-purple-900">{mockData.dashboard.inventoryLevels.fruska}</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white shadow-sm border-slate-200">
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold text-slate-900 flex items-center">
+                <Users className="w-5 h-5 mr-2" />
+                Outstanding Receivables
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center p-4">
+                <p className="text-3xl font-bold text-red-600">{mockData.dashboard.outstandingReceivables}</p>
+                <p className="text-sm text-slate-600 mt-1">Total Credit Sales Due</p>
+                <div className="flex items-center justify-center mt-2 text-sm">
+                  <ArrowUpRight className="w-4 h-4 text-red-600 mr-1" />
+                  <span className="text-red-600">+15%</span>
+                  <span className="text-slate-500 ml-1">vs last week</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Additional Metrics */}
+        <div className="grid grid-cols-2 gap-4">
+          <StatCard
             title="Production"
             value={mockData.dashboard.totalProduction}
             change="-3%"
