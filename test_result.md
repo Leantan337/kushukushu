@@ -213,6 +213,54 @@ backend:
         agent: "main"
         comment: "Implemented POST /api/milling-orders (creates order, deducts raw wheat) and POST /api/milling-orders/{id}/complete (records outputs, adds finished products to inventory). Includes stock validation, auto-inventory updates, and comprehensive audit logging for production workflow."
 
+  - task: "Sales Role - Point of Sale (POS) Transaction API"
+    implemented: true
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Implemented POST /api/sales-transactions endpoint with comprehensive POS functionality. Automatically deducts inventory, handles cash/check/transfer/loan payments, tracks unpaid status for loans with customer info, validates stock levels, includes transaction items with pricing, and comprehensive audit logging."
+
+  - task: "Sales Role - Inventory Request API"
+    implemented: true
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Implemented POST /api/inventory-requests endpoint for Sales role to request flour stock from main store. Creates InternalOrderRequisitions with pending status, integrates with existing manager approval workflow."
+
+  - task: "Sales Role - Purchase Request API"
+    implemented: true
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Implemented POST /api/purchase-requests endpoint for Sales role to request purchase of supplies (office items, packaging materials). Creates PurchaseRequisitions with pending status, integrates with existing 3-level approval workflow."
+
+  - task: "Sales Role - Sales Reports API"
+    implemented: true
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Implemented GET /api/reports/sales endpoint with filtering by period (daily/weekly/monthly), date range, and sales person. Returns transaction history, summary statistics (total sales, cash/credit breakdown), and top products sold."
+
 frontend:
   - task: "Update localization from Nigerian to Ethiopian (currency, locations)"
     implemented: true
