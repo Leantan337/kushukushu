@@ -6,6 +6,9 @@ import OwnerDashboard from "./components/owner/OwnerDashboard";
 import RatioConfiguration from "./components/owner/RatioConfiguration";
 import ApprovalsScreen from "./components/owner/ApprovalsScreen";
 import AlertsScreen from "./components/owner/AlertsScreen";
+import AdminLogin from "./components/admin/AdminLogin";
+import AdminDashboard from "./components/admin/AdminDashboard";
+import UserManagement from "./components/admin/UserManagement";
 import { Toaster } from "./components/ui/toaster";
 
 function App() {
@@ -13,11 +16,17 @@ function App() {
     <div className="App">
       <BrowserRouter>
         <Routes>
+          {/* Owner Routes (Mobile) */}
           <Route path="/" element={<OwnerLogin />} />
           <Route path="/dashboard" element={<OwnerDashboard />} />
           <Route path="/ratio-config" element={<RatioConfiguration />} />
           <Route path="/approvals" element={<ApprovalsScreen />} />
           <Route path="/alerts" element={<AlertsScreen />} />
+          
+          {/* Admin Routes (Web) */}
+          <Route path="/admin" element={<AdminLogin />} />
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route path="/admin/users" element={<UserManagement />} />
         </Routes>
       </BrowserRouter>
       <Toaster />
