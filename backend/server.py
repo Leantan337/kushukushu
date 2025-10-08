@@ -198,6 +198,7 @@ class InternalOrderRequisition(BaseModel):
     requested_by: str
     requested_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     status: InternalOrderStatus = InternalOrderStatus.PENDING_APPROVAL
+    manager_approval_status: ManagerApprovalStatus = ManagerApprovalStatus.PENDING
     approved_by: Optional[str] = None
     approved_at: Optional[datetime] = None
     fulfilled_by: Optional[str] = None
