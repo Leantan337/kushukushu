@@ -55,7 +55,7 @@ const InternalOrderRequisitions = ({ userRole = "sales" }) => {
 
   const fetchOrders = async () => {
     try {
-      const backendUrl = import.meta.env.REACT_APP_BACKEND_URL || process.env.REACT_APP_BACKEND_URL;
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
       const response = await fetch(`${backendUrl}/internal-orders`);
       if (response.ok) {
         const data = await response.json();
@@ -165,7 +165,7 @@ const InternalOrderRequisitions = ({ userRole = "sales" }) => {
 
     setLoading(true);
     try {
-      const backendUrl = import.meta.env.REACT_APP_BACKEND_URL || process.env.REACT_APP_BACKEND_URL;
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
       const response = await fetch(`${backendUrl}/internal-orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -196,7 +196,7 @@ const InternalOrderRequisitions = ({ userRole = "sales" }) => {
   const handleApprove = async () => {
     setLoading(true);
     try {
-      const backendUrl = import.meta.env.REACT_APP_BACKEND_URL || process.env.REACT_APP_BACKEND_URL;
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
       const response = await fetch(`${backendUrl}/internal-orders/${selectedOrder.id}/approve`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -226,7 +226,7 @@ const InternalOrderRequisitions = ({ userRole = "sales" }) => {
 
     setLoading(true);
     try {
-      const backendUrl = import.meta.env.REACT_APP_BACKEND_URL || process.env.REACT_APP_BACKEND_URL;
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
       const response = await fetch(`${backendUrl}/internal-orders/${selectedOrder.id}/fulfill`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -259,7 +259,7 @@ const InternalOrderRequisitions = ({ userRole = "sales" }) => {
 
     setLoading(true);
     try {
-      const backendUrl = import.meta.env.REACT_APP_BACKEND_URL || process.env.REACT_APP_BACKEND_URL;
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
       const response = await fetch(`${backendUrl}/internal-orders/${selectedOrder.id}/reject`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
