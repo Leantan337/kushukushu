@@ -65,8 +65,14 @@ function App() {
           {/* Store Keeper Routes */}
           <Route path="/storekeeper/dashboard" element={<StoreKeeperDashboard />} />
           
-          {/* Placeholder routes for other roles */}
-          <Route path="/finance/dashboard" element={<div className="p-8 text-center"><h1 className="text-2xl font-bold">Finance Dashboard - Coming Soon</h1></div>} />
+          {/* Demo Routes for Client Presentation */}
+          <Route path="/demo/pos" element={<SimplePOS />} />
+          <Route path="/demo/inventory" element={<SimpleInventoryDashboard />} />
+          <Route path="/demo/sales" element={<SimpleSalesDashboard />} />
+          <Route path="/demo/finance" element={<FinanceDashboard />} />
+          
+          {/* Finance Routes */}
+          <Route path="/finance/dashboard" element={<FinanceDashboard />} />
         </Routes>
       </BrowserRouter>
       <Toaster />
