@@ -52,6 +52,22 @@ class StockAdjustmentStatus(str, Enum):
     APPROVED = "approved"
     REJECTED = "rejected"
 
+class ManagerApprovalStatus(str, Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+class MillingOrderStatus(str, Enum):
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+
+class QualityRating(str, Enum):
+    EXCELLENT = "excellent"
+    GOOD = "good"
+    AVERAGE = "average"
+    POOR = "poor"
+
 
 # Define Models
 class StatusCheck(BaseModel):
