@@ -16,7 +16,8 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   FileBarChart,
-  UserCog
+  UserCog,
+  LogOut
 } from "lucide-react";
 import { mockData } from "../../data/mockData";
 
