@@ -21,7 +21,8 @@ import {
   Activity,
   ShoppingCart,
   Boxes,
-  Wallet
+  Wallet,
+  LogOut
 } from "lucide-react";
 import { mockData } from "../../data/mockData";
 
