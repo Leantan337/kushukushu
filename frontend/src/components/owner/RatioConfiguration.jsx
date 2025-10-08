@@ -61,7 +61,7 @@ const RatioConfiguration = () => {
   };
 
   const resetRatios = () => {
-    setRatios({ flour: 70, fruska: 25, fruskelo: 5 });
+    setRatios({ flour: 70, fruska: 25, fruskelo: 3, waste: 2 });
   };
 
   const isValidConfiguration = () => {
