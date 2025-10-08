@@ -42,7 +42,7 @@ const PurchaseRequisitions = ({ userRole = "manager" }) => {
 
   const fetchRequisitions = async () => {
     try {
-      const backendUrl = import.meta.env.REACT_APP_BACKEND_URL || process.env.REACT_APP_BACKEND_URL;
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
       const response = await fetch(`${backendUrl}/purchase-requisitions`);
       if (response.ok) {
         const data = await response.json();
@@ -163,7 +163,7 @@ const PurchaseRequisitions = ({ userRole = "manager" }) => {
 
     setLoading(true);
     try {
-      const backendUrl = import.meta.env.REACT_APP_BACKEND_URL || process.env.REACT_APP_BACKEND_URL;
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
       const response = await fetch(`${backendUrl}/purchase-requisitions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -194,7 +194,7 @@ const PurchaseRequisitions = ({ userRole = "manager" }) => {
   const handleApprove = async () => {
     setLoading(true);
     try {
-      const backendUrl = import.meta.env.REACT_APP_BACKEND_URL || process.env.REACT_APP_BACKEND_URL;
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
       let endpoint = '';
       
       if (userRole === "manager") endpoint = `/purchase-requisitions/${selectedRequisition.id}/approve-manager`;
@@ -234,7 +234,7 @@ const PurchaseRequisitions = ({ userRole = "manager" }) => {
 
     setLoading(true);
     try {
-      const backendUrl = import.meta.env.REACT_APP_BACKEND_URL || process.env.REACT_APP_BACKEND_URL;
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
       const response = await fetch(`${backendUrl}/purchase-requisitions/${selectedRequisition.id}/reject`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -266,7 +266,7 @@ const PurchaseRequisitions = ({ userRole = "manager" }) => {
 
     setLoading(true);
     try {
-      const backendUrl = import.meta.env.REACT_APP_BACKEND_URL || process.env.REACT_APP_BACKEND_URL;
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
       const response = await fetch(`${backendUrl}/purchase-requisitions/${requisition.id}/mark-purchased?user=${encodeURIComponent(currentUser)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' }
