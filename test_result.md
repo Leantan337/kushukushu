@@ -348,15 +348,18 @@ frontend:
 
   - task: "Update routing for new sections"
     implemented: true
-    working: "NA"
+    working: true
     file: "App.js"
     stuck_count: 0
     priority: "low"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: true
         agent: "main"
         comment: "Added routes for /reports and /user-management, imported new components, added navigation buttons to dashboard for easy access to new sections"
+      - working: true
+        agent: "main"
+        comment: "Updated routing to include /sales/dashboard route with SalesDashboard component. All role-based routes now properly configured and working."
 
   - task: "Manager Dashboard Implementation"
     implemented: true
