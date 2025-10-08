@@ -230,15 +230,18 @@ backend:
 
   - task: "Sales Role - Inventory Request API"
     implemented: true
-    working: "NA"
+    working: true
     file: "server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: true
         agent: "main"
         comment: "Implemented POST /api/inventory-requests endpoint for Sales role to request flour stock from main store. Creates InternalOrderRequisitions with pending status, integrates with existing manager approval workflow."
+      - working: true
+        agent: "testing"
+        comment: "Comprehensive testing completed successfully. All package sizes working correctly: 50kg (10 packages = 500kg total), 25kg (8 packages = 200kg total), 10kg (15 packages = 150kg total), 5kg (20 packages = 100kg total). Total weight calculation accurate for all package sizes. Invalid package size validation working (15kg returns 400 error). Request numbering sequential (REQ-000001, REQ-000002, etc.). Status correctly set to 'pending_approval'. Integration with existing internal order workflow confirmed. All acceptance criteria met."
 
   - task: "Sales Role - Purchase Request API"
     implemented: true
