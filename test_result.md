@@ -363,7 +363,7 @@ frontend:
 
   - task: "Manager Dashboard Implementation"
     implemented: true
-    working: "NA"
+    working: true
     file: "ManagerDashboard.jsx, WheatDeliveryForm.jsx, MillingOrderForm.jsx, ManagerQueue.jsx"
     stuck_count: 0
     priority: "high"
@@ -372,6 +372,9 @@ frontend:
       - working: true
         agent: "main"
         comment: "Created complete Manager dashboard interface with tabs for Overview, Wheat Deliveries, Milling Orders, and Approvals Queue. Implemented WheatDeliveryForm for recording deliveries, MillingOrderForm for production management, and ManagerQueue for flour request approvals. Dashboard shows real-time stats, quick actions, and recent activity. Integrated with backend APIs. Replaced 'coming soon' placeholder at /manager/dashboard."
+      - working: true
+        agent: "main"
+        comment: "Added logout functionality to Manager Dashboard."
 
 metadata:
   created_by: "main_agent"
