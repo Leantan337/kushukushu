@@ -1262,6 +1262,321 @@ async def get_audit_logs(entity_type: Optional[str] = None, user: Optional[str] 
         deserialize_datetime(log)
     return logs
 
+
+# ==================== SALES ROLE ENDPOINTS ====================
+
+@api_router.post("/sales-transactions", response_model=SalesTransaction)
+async def create_sales_transaction(transaction: SalesTransactionCreate):
+    """
+    Point of Sale (POS) endpoint - Creates a new sales transaction and deducts inventory.
+    Accessible only by users with 'Sales' role.
+    """
+    # Generate transaction number
+    transaction_count = await db.sales_transactions.count_documents({})
+    transaction_number = f"TXN-{transaction_count + 1:06d}"
+    
+    # Validate and process items
+    transaction_items = []
+    total_amount = 0.0
+    
+    for item_data in transaction.items:
+        # Validate product exists in inventory
+        product = await db.inventory.find_one({"id": item_data["product_id"]}, {"_id": 0})
+        if not product:
+            raise HTTPException(status_code=404, detail=f"Product {item_data['product_id']} not found")
+        
+        # Check sufficient stock
+        if product["quantity"] < item_data["quantity_kg"]:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Insufficient stock for {product['name']}. Available: {product['quantity']}kg, Requested: {item_data['quantity_kg']}kg"
+            )
+        
+        # Create transaction item
+        item_total = item_data["quantity_kg"] * item_data["unit_price"]
+        transaction_item = SalesTransactionItem(
+            product_id=item_data["product_id"],
+            product_name=item_data["product_name"],
+            quantity_kg=item_data["quantity_kg"],
+            unit_price=item_data["unit_price"],
+            total_price=item_total
+        )
+        transaction_items.append(transaction_item)
+        total_amount += item_total
+    
+    # Determine transaction status based on payment type
+    status = TransactionStatus.PAID if transaction.payment_type != PaymentType.LOAN else TransactionStatus.UNPAID
+    
+    # Validate customer info for loan transactions
+    if transaction.payment_type == PaymentType.LOAN:
+        if not transaction.customer_id or not transaction.customer_name:
+            raise HTTPException(status_code=400, detail="Customer ID and name are required for loan transactions")
+    
+    # Create sales transaction
+    sales_transaction = SalesTransaction(
+        transaction_number=transaction_number,
+        items=transaction_items,
+        total_amount=total_amount,
+        payment_type=transaction.payment_type,
+        status=status,
+        sales_person_id=transaction.sales_person_id,
+        sales_person_name=transaction.sales_person_name,
+        branch_id=transaction.branch_id,
+        customer_id=transaction.customer_id,
+        customer_name=transaction.customer_name
+    )
+    
+    # Save to database
+    sales_dict = sales_transaction.model_dump()
+    serialize_datetime(sales_dict)
+    result = await db.sales_transactions.insert_one(sales_dict)
+    
+    # Deduct inventory for each item
+    for item_data in transaction.items:
+        # Update inventory quantity
+        await db.inventory.update_one(
+            {"id": item_data["product_id"]},
+            {
+                "$inc": {"quantity": -item_data["quantity_kg"]},
+                "$set": {"updated_at": datetime.now(timezone.utc)}
+            }
+        )
+        
+        # Add transaction to inventory history
+        inventory_transaction = Transaction(
+            type="out",
+            quantity=item_data["quantity_kg"],
+            reference=f"Sales Transaction {transaction_number}",
+            performed_by=transaction.sales_person_name
+        )
+        
+        await db.inventory.update_one(
+            {"id": item_data["product_id"]},
+            {"$push": {"transactions": inventory_transaction.model_dump()}}
+        )
+        
+        # Update stock level
+        product = await db.inventory.find_one({"id": item_data["product_id"]}, {"_id": 0})
+        new_quantity = product["quantity"] - item_data["quantity_kg"]
+        stock_level = StockLevel.OK
+        if new_quantity <= product.get("critical_threshold", 2000.0):
+            stock_level = StockLevel.CRITICAL
+        elif new_quantity <= product.get("low_threshold", 5000.0):
+            stock_level = StockLevel.LOW
+        
+        await db.inventory.update_one(
+            {"id": item_data["product_id"]},
+            {"$set": {"stock_level": stock_level}}
+        )
+        
+        # Log audit trail
+        await log_audit(
+            user=transaction.sales_person_name,
+            action="inventory_deduction",
+            entity_type="sales_transaction",
+            entity_id=sales_transaction.id,
+            details={
+                "product_id": item_data["product_id"],
+                "product_name": item_data["product_name"],
+                "quantity_sold": item_data["quantity_kg"],
+                "transaction_number": transaction_number,
+                "payment_type": transaction.payment_type.value
+            }
+        )
+    
+    # Log sales transaction audit
+    await log_audit(
+        user=transaction.sales_person_name,
+        action="create_sales_transaction",
+        entity_type="sales_transaction",
+        entity_id=sales_transaction.id,
+        details={
+            "transaction_number": transaction_number,
+            "total_amount": total_amount,
+            "payment_type": transaction.payment_type.value,
+            "status": status.value,
+            "items_count": len(transaction_items)
+        }
+    )
+    
+    return sales_transaction
+
+
+@api_router.post("/inventory-requests", response_model=InternalOrderRequisition)
+async def create_inventory_request_sales(order: InternalOrderCreate):
+    """
+    Creates a new internal order requisition (sales team requesting flour stock).
+    Accessible only by users with 'Sales' role.
+    """
+    # Generate request number
+    request_count = await db.internal_order_requisitions.count_documents({})
+    request_number = f"REQ-{request_count + 1:06d}"
+    
+    # Calculate total weight based on package size
+    package_size_map = {
+        "50kg": 50, "25kg": 25, "10kg": 10, "5kg": 5
+    }
+    package_weight = package_size_map.get(order.package_size, 0)
+    if package_weight == 0:
+        raise HTTPException(status_code=400, detail="Invalid package size")
+    
+    total_weight = order.quantity * package_weight
+    
+    # Create internal order
+    internal_order = InternalOrderRequisition(
+        request_number=request_number,
+        product_name=order.product_name,
+        package_size=order.package_size,
+        quantity=order.quantity,
+        total_weight=total_weight,
+        requested_by=order.requested_by,
+        status=InternalOrderStatus.PENDING_APPROVAL,
+        manager_approval_status=ManagerApprovalStatus.PENDING
+    )
+    
+    # Save to database
+    order_dict = internal_order.model_dump()
+    serialize_datetime(order_dict)
+    result = await db.internal_order_requisitions.insert_one(order_dict)
+    
+    # Log audit trail
+    await log_audit(
+        user=order.requested_by,
+        action="create_inventory_request",
+        entity_type="internal_order_requisition",
+        entity_id=internal_order.id,
+        details={
+            "request_number": request_number,
+            "product_name": order.product_name,
+            "quantity": order.quantity,
+            "package_size": order.package_size,
+            "total_weight": total_weight
+        }
+    )
+    
+    return internal_order
+
+
+@api_router.post("/purchase-requests", response_model=PurchaseRequisition)
+async def create_purchase_request_sales(requisition: PurchaseRequisitionCreate):
+    """
+    Creates a new purchase requisition (sales team requesting purchase of items).
+    Accessible only by users with 'Sales' role.
+    """
+    # Generate request number
+    request_count = await db.purchase_requisitions.count_documents({})
+    request_number = f"PR-{request_count + 1:06d}"
+    
+    # Create purchase requisition
+    purchase_req = PurchaseRequisition(
+        request_number=request_number,
+        description=requisition.description,
+        estimated_cost=requisition.estimated_cost,
+        reason=requisition.reason,
+        requested_by=requisition.requested_by,
+        status=PurchaseRequisitionStatus.PENDING
+    )
+    
+    # Save to database
+    req_dict = purchase_req.model_dump()
+    serialize_datetime(req_dict)
+    result = await db.purchase_requisitions.insert_one(req_dict)
+    
+    # Log audit trail
+    await log_audit(
+        user=requisition.requested_by,
+        action="create_purchase_request",
+        entity_type="purchase_requisition",
+        entity_id=purchase_req.id,
+        details={
+            "request_number": request_number,
+            "description": requisition.description,
+            "estimated_cost": requisition.estimated_cost,
+            "reason": requisition.reason
+        }
+    )
+    
+    return purchase_req
+
+
+@api_router.get("/reports/sales")
+async def get_sales_report(
+    period: str = "daily",
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    sales_person_id: Optional[str] = None
+):
+    """
+    Fetches sales data for reports. Supports filtering by period, date range, and sales person.
+    Accessible only by users with 'Sales' role.
+    """
+    # Build date filter
+    query = {}
+    
+    if start_date and end_date:
+        try:
+            start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+            end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+            query["timestamp"] = {"$gte": start_dt, "$lte": end_dt}
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use ISO format.")
+    elif period == "daily":
+        # Today's transactions
+        today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        tomorrow = today.replace(day=today.day + 1)
+        query["timestamp"] = {"$gte": today, "$lt": tomorrow}
+    elif period == "weekly":
+        # Last 7 days
+        week_ago = datetime.now(timezone.utc) - datetime.timedelta(days=7)
+        query["timestamp"] = {"$gte": week_ago}
+    elif period == "monthly":
+        # Current month
+        today = datetime.now(timezone.utc)
+        month_start = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        query["timestamp"] = {"$gte": month_start}
+    
+    if sales_person_id:
+        query["sales_person_id"] = sales_person_id
+    
+    # Fetch transactions
+    transactions = await db.sales_transactions.find(query, {"_id": 0}).sort("timestamp", -1).to_list(1000)
+    
+    for transaction in transactions:
+        deserialize_datetime(transaction)
+    
+    # Calculate summary statistics
+    total_sales = sum(t.get("total_amount", 0) for t in transactions)
+    total_transactions = len(transactions)
+    cash_sales = sum(t.get("total_amount", 0) for t in transactions if t.get("payment_type") == "cash")
+    credit_sales = sum(t.get("total_amount", 0) for t in transactions if t.get("payment_type") == "loan")
+    
+    # Top products sold
+    product_sales = {}
+    for transaction in transactions:
+        for item in transaction.get("items", []):
+            product_name = item.get("product_name", "Unknown")
+            quantity = item.get("quantity_kg", 0)
+            if product_name in product_sales:
+                product_sales[product_name] += quantity
+            else:
+                product_sales[product_name] = quantity
+    
+    top_products = sorted(product_sales.items(), key=lambda x: x[1], reverse=True)[:5]
+    
+    return {
+        "summary": {
+            "period": period,
+            "total_sales": total_sales,
+            "total_transactions": total_transactions,
+            "cash_sales": cash_sales,
+            "credit_sales": credit_sales,
+            "average_transaction": total_sales / max(total_transactions, 1)
+        },
+        "transactions": transactions,
+        "top_products": [{"name": name, "quantity_sold": qty} for name, qty in top_products]
+    }
+
+
 # Include the router in the main app
 app.include_router(api_router)
 
