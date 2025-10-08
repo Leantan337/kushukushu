@@ -245,15 +245,18 @@ backend:
 
   - task: "Sales Role - Purchase Request API"
     implemented: true
-    working: "NA"
+    working: true
     file: "server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: true
         agent: "main"
         comment: "Implemented POST /api/purchase-requests endpoint for Sales role to request purchase of supplies (office items, packaging materials). Creates PurchaseRequisitions with pending status, integrates with existing 3-level approval workflow."
+      - working: true
+        agent: "testing"
+        comment: "Comprehensive testing completed successfully. All request types working correctly: office supplies (pens, paper, folders - ETB 2,500), packaging materials (flour bags - ETB 15,000), marketing materials (banners, brochures - ETB 5,000). Request numbering sequential (PR-000001, PR-000002, etc.). Status correctly set to 'pending' for integration with 3-level approval workflow (Manager → Admin → Owner). All required fields captured correctly (description, estimated_cost, reason, requested_by). All acceptance criteria met."
 
   - task: "Sales Role - Sales Reports API"
     implemented: true
