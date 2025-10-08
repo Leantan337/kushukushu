@@ -312,7 +312,7 @@ def deserialize_datetime(doc):
             if isinstance(value, str) and 'T' in value:
                 try:
                     doc[key] = datetime.fromisoformat(value)
-                except:
+                except ValueError:
                     pass
             elif isinstance(value, dict):
                 deserialize_datetime(value)
