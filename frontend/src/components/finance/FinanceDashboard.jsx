@@ -22,7 +22,8 @@ import {
   Building2,
   Bell,
   Settings,
-  Download
+  Download,
+  Shield
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -42,6 +43,7 @@ const FinanceDashboard = () => {
     recentTransactions: [],
     alerts: []
   });
+  const [spendingLimits, setSpendingLimits] = useState(null);
 
   useEffect(() => {
     // Load dashboard data
@@ -51,6 +53,7 @@ const FinanceDashboard = () => {
   const loadDashboardData = async () => {
     setLoading(true);
     const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
+    const financeOfficer = 'Finance Officer'; // Replace with actual user
     
     try {
       // Parallel fetch all data
@@ -59,14 +62,18 @@ const FinanceDashboard = () => {
         pendingAuth,
         recentTxns,
         pendingRecon,
-        loansData
+        loansData,
+        limitsData
       ] = await Promise.all([
         fetch(`${BACKEND_URL}/api/finance/summary`).then(r => r.ok ? r.json() : {}),
         fetch(`${BACKEND_URL}/api/finance/pending-authorizations`).then(r => r.ok ? r.json() : []),
         fetch(`${BACKEND_URL}/api/finance/transactions?limit=10`).then(r => r.ok ? r.json() : []),
         fetch(`${BACKEND_URL}/api/finance/reconciliation/pending`).then(r => r.ok ? r.json() : []),
-        fetch(`${BACKEND_URL}/api/loans?status=active&limit=100`).then(r => r.ok ? r.json() : [])
+        fetch(`${BACKEND_URL}/api/loans?status=active&limit=100`).then(r => r.ok ? r.json() : []),
+        fetch(`${BACKEND_URL}/api/finance/spending-limits?finance_officer=${financeOfficer}`).then(r => r.ok ? r.json() : null)
       ]);
+      
+      setSpendingLimits(limitsData);
 
       // Calculate KPIs
       const totalReceivable = loansData.reduce((sum, loan) => sum + (loan.balance || 0), 0);
@@ -376,6 +383,107 @@ const FinanceDashboard = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Spending Limits Widget */}
+        {spendingLimits && (
+          <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-white shadow-md">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-purple-900 flex items-center gap-2">
+                <Shield className="w-5 h-5" />
+                Your Spending Limits
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Daily Limit */}
+                {spendingLimits.daily_limit && (
+                  <div className="bg-white p-4 rounded-lg border border-purple-200">
+                    <p className="text-sm text-purple-700 mb-2">Today's Spending</p>
+                    <div className="flex items-baseline gap-2 mb-1">
+                      <span className="text-2xl font-bold text-purple-900">
+                        {formatCurrency(spendingLimits.daily_spent)}
+                      </span>
+                      <span className="text-sm text-slate-500">
+                        / {formatCurrency(spendingLimits.daily_limit)}
+                      </span>
+                    </div>
+                    <div className="w-full bg-purple-200 rounded-full h-2 mt-2">
+                      <div
+                        className={`h-2 rounded-full ${
+                          (spendingLimits.daily_spent / spendingLimits.daily_limit) > 0.8 ? 'bg-red-500' :
+                          (spendingLimits.daily_spent / spendingLimits.daily_limit) > 0.5 ? 'bg-amber-500' :
+                          'bg-green-500'
+                        }`}
+                        style={{ width: `${Math.min((spendingLimits.daily_spent / spendingLimits.daily_limit) * 100, 100)}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-purple-600 mt-1">
+                      Remaining: {formatCurrency(spendingLimits.daily_remaining)}
+                    </p>
+                  </div>
+                )}
+
+                {/* Monthly Limit */}
+                {spendingLimits.monthly_limit && (
+                  <div className="bg-white p-4 rounded-lg border border-purple-200">
+                    <p className="text-sm text-purple-700 mb-2">This Month's Spending</p>
+                    <div className="flex items-baseline gap-2 mb-1">
+                      <span className="text-2xl font-bold text-purple-900">
+                        {formatCurrency(spendingLimits.monthly_spent)}
+                      </span>
+                      <span className="text-sm text-slate-500">
+                        / {formatCurrency(spendingLimits.monthly_limit)}
+                      </span>
+                    </div>
+                    <div className="w-full bg-purple-200 rounded-full h-2 mt-2">
+                      <div
+                        className={`h-2 rounded-full ${
+                          (spendingLimits.monthly_spent / spendingLimits.monthly_limit) > 0.8 ? 'bg-red-500' :
+                          (spendingLimits.monthly_spent / spendingLimits.monthly_limit) > 0.5 ? 'bg-amber-500' :
+                          'bg-green-500'
+                        }`}
+                        style={{ width: `${Math.min((spendingLimits.monthly_spent / spendingLimits.monthly_limit) * 100, 100)}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-purple-600 mt-1">
+                      Remaining: {formatCurrency(spendingLimits.monthly_remaining)}
+                    </p>
+                  </div>
+                )}
+
+                {/* Authorization Thresholds */}
+                {spendingLimits.thresholds && (
+                  <div className="bg-white p-4 rounded-lg border border-purple-200 md:col-span-2">
+                    <p className="text-sm text-purple-700 mb-3 font-semibold">Payment Authorization Levels</p>
+                    <div className="grid grid-cols-3 gap-3 text-xs">
+                      <div className="text-center">
+                        <div className="bg-green-100 rounded-lg p-2 mb-1">
+                          <p className="font-semibold text-green-900">Auto-Process</p>
+                          <p className="text-green-700">&lt; {formatCurrency(spendingLimits.thresholds.auto_approval)}</p>
+                        </div>
+                        <p className="text-slate-600">Direct processing</p>
+                      </div>
+                      <div className="text-center">
+                        <div className="bg-amber-100 rounded-lg p-2 mb-1">
+                          <p className="font-semibold text-amber-900">Owner Approval</p>
+                          <p className="text-amber-700">&gt; {formatCurrency(spendingLimits.thresholds.owner_approval)}</p>
+                        </div>
+                        <p className="text-slate-600">Request funds</p>
+                      </div>
+                      <div className="text-center">
+                        <div className="bg-red-100 rounded-lg p-2 mb-1">
+                          <p className="font-semibold text-red-900">Multi-Signature</p>
+                          <p className="text-red-700">&gt; {formatCurrency(spendingLimits.thresholds.multi_signature)}</p>
+                        </div>
+                        <p className="text-slate-600">Owner + Admin</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Quick Actions */}
         <Card className="border-slate-200 shadow-md">

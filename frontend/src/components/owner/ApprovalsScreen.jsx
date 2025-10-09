@@ -60,12 +60,12 @@ const ApprovalsScreen = () => {
     const TypeIcon = getTypeIcon(approval.type);
     
     return (
-      <Card className="bg-white shadow-sm border-slate-200 hover:shadow-md transition-shadow duration-200">
-        <CardHeader className="pb-3">
+      <Card className="bg-white shadow-lg border-slate-200 hover:shadow-xl transition-all duration-200 hover:border-indigo-300">
+        <CardHeader className="pb-3 bg-gradient-to-r from-slate-50 to-white border-b border-slate-100">
           <div className="flex items-start justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
-                <TypeIcon className="w-5 h-5 text-slate-600" />
+              <div className="w-12 h-12 bg-gradient-to-br from-indigo-100 to-indigo-50 rounded-xl flex items-center justify-center shadow-sm">
+                <TypeIcon className="w-6 h-6 text-indigo-600" />
               </div>
               <div className="flex-1">
                 <CardTitle className="text-base font-semibold text-slate-900 leading-tight">
@@ -80,41 +80,45 @@ const ApprovalsScreen = () => {
           </div>
         </CardHeader>
         
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 pt-4">
           <div className="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <p className="text-slate-500 font-medium">Amount</p>
-              <p className="text-slate-900 font-semibold">{approval.amount}</p>
+            <div className="bg-slate-50 p-3 rounded-lg">
+              <p className="text-slate-600 font-medium mb-1">Amount</p>
+              <p className="text-indigo-700 font-bold text-lg">{approval.amount}</p>
             </div>
-            <div>
-              <p className="text-slate-500 font-medium">Requested By</p>
+            <div className="bg-slate-50 p-3 rounded-lg">
+              <p className="text-slate-600 font-medium mb-1">Requested By</p>
               <p className="text-slate-900 font-semibold">{approval.requestedBy}</p>
             </div>
           </div>
           
-          <div>
-            <p className="text-slate-500 font-medium text-sm">Description</p>
-            <p className="text-slate-700 text-sm mt-1 leading-relaxed">{approval.description}</p>
+          <div className="bg-white border border-slate-200 p-3 rounded-lg">
+            <p className="text-slate-600 font-medium text-sm mb-1">Description</p>
+            <p className="text-slate-700 text-sm leading-relaxed">{approval.description}</p>
           </div>
           
-          <div className="flex items-center justify-between text-xs text-slate-500">
-            <span>Submitted: {approval.date}</span>
+          <div className="flex items-center justify-between text-xs text-slate-500 px-1">
+            <span className="flex items-center gap-1">
+              <Calendar className="w-3 h-3" />
+              Submitted: {approval.date}
+            </span>
           </div>
           
-          <div className="flex space-x-3 pt-2">
+          <div className="flex space-x-3 pt-2 border-t border-slate-100">
             <Button
               onClick={() => handleReject(approval.id)}
-              variant="outline"
-              className="flex-1 h-10 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+              className="flex-1 h-11 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white shadow-md hover:shadow-lg transition-all"
+              size="lg"
             >
-              <XCircle className="w-4 h-4 mr-2" />
+              <XCircle className="w-5 h-5 mr-2" />
               Reject
             </Button>
             <Button
               onClick={() => handleApprove(approval.id)}
-              className="flex-1 h-10 bg-green-600 hover:bg-green-700 text-white"
+              className="flex-1 h-11 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-md hover:shadow-lg transition-all"
+              size="lg"
             >
-              <CheckCircle className="w-4 h-4 mr-2" />
+              <CheckCircle className="w-5 h-5 mr-2" />
               Approve
             </Button>
           </div>
@@ -124,39 +128,46 @@ const ApprovalsScreen = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50">
       {/* Header */}
-      <div className="bg-white shadow-sm border-b border-slate-200">
-        <div className="px-4 py-4">
+      <div className="bg-white shadow-sm border border-slate-200 mx-6 mt-6 rounded-xl">
+        <div className="px-6 py-5">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center gap-4">
               <Button
                 variant="outline"
-                size="sm"
+                size="icon"
                 onClick={() => navigate("/dashboard")}
-                className="border-slate-200"
+                className="border-slate-300 hover:bg-slate-50"
               >
                 <ArrowLeft className="w-4 h-4" />
               </Button>
-              <div>
-                <h1 className="text-xl font-semibold text-slate-900">Approvals</h1>
-                <p className="text-sm text-slate-600">{filteredApprovals.length} pending requests</p>
+              <div className="flex items-center gap-4">
+                <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 p-3 rounded-xl shadow-lg">
+                  <CheckCircle className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-slate-900">General Approvals</h1>
+                  <p className="text-sm text-slate-600">Stock requests, purchase orders, and other approvals</p>
+                </div>
               </div>
             </div>
-            <CheckCircle className="w-6 h-6 text-slate-600" />
+            <Badge variant="outline" className="text-base px-4 py-2 border-indigo-300 text-indigo-700 bg-indigo-50">
+              {filteredApprovals.length} Pending
+            </Badge>
           </div>
         </div>
       </div>
 
-      <div className="p-4">
+      <div className="p-6 max-w-7xl mx-auto">
         {/* Tabs for different approval types */}
-        <Tabs defaultValue="stock-requests" className="space-y-4">
-          <TabsList className="bg-white border border-slate-200">
-            <TabsTrigger value="stock-requests" className="flex items-center gap-2">
+        <Tabs defaultValue="stock-requests" className="space-y-6">
+          <TabsList className="bg-white border border-slate-200 p-1 rounded-lg shadow-sm">
+            <TabsTrigger value="stock-requests" className="flex items-center gap-2 data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
               <Package className="w-4 h-4" />
               Stock Requests (Real Data)
             </TabsTrigger>
-            <TabsTrigger value="other" className="flex items-center gap-2">
+            <TabsTrigger value="other" className="flex items-center gap-2 data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
               <DollarSign className="w-4 h-4" />
               Other Approvals
             </TabsTrigger>
@@ -179,13 +190,13 @@ const ApprovalsScreen = () => {
                   onClick={() => setFilter(filterOption)}
                   className={`whitespace-nowrap ${
                     filter === filterOption
-                      ? "bg-slate-900 text-white"
-                      : "border-slate-200 text-slate-700 hover:bg-slate-50"
+                      ? "bg-indigo-600 hover:bg-indigo-700 text-white"
+                      : "border-slate-300 text-slate-700 hover:bg-slate-50"
                   }`}
                 >
                   {filterOption}
                   {filterOption !== "All" && (
-                    <Badge className="ml-2 bg-white text-slate-900 text-xs">
+                    <Badge className="ml-2 bg-white text-indigo-700 text-xs">
                       {approvals.filter(a => a.priority === filterOption).length}
                     </Badge>
                   )}
@@ -195,10 +206,12 @@ const ApprovalsScreen = () => {
 
             {/* Approvals List */}
             {filteredApprovals.length === 0 ? (
-              <Card className="bg-white shadow-sm border-slate-200">
-                <CardContent className="p-8 text-center">
-                  <CheckCircle className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-slate-900 mb-2">All Caught Up!</h3>
+              <Card className="bg-white shadow-lg border-slate-200">
+                <CardContent className="p-12 text-center">
+                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <CheckCircle className="w-12 h-12 text-green-600" />
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-900 mb-2">All Caught Up!</h3>
                   <p className="text-slate-600">No pending approvals at the moment.</p>
                 </CardContent>
               </Card>

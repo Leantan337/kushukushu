@@ -8,6 +8,9 @@ import ApprovalsScreen from "./components/owner/ApprovalsScreen";
 import AlertsScreen from "./components/owner/AlertsScreen";
 import ReportsScreen from "./components/owner/ReportsScreen";
 import UserManagementScreen from "./components/owner/UserManagementScreen";
+import OwnerFundApprovalQueue from "./components/owner/OwnerFundApprovalQueue";
+import FinancialControlSettings from "./components/owner/FinancialControlSettings";
+import InventoryValuationDashboard from "./components/owner/InventoryValuationDashboard";
 import AdminDashboard from "./components/admin/AdminDashboard";
 import UserManagement from "./components/admin/UserManagement";
 import InventoryManagement from "./components/inventory/InventoryManagement";
@@ -47,6 +50,9 @@ function App() {
           <Route path="/alerts" element={<AlertsScreen />} />
           <Route path="/reports" element={<ReportsScreen />} />
           <Route path="/user-management" element={<UserManagementScreen />} />
+          <Route path="/owner/fund-approvals" element={<OwnerFundApprovalQueue />} />
+          <Route path="/owner/financial-controls" element={<FinancialControlSettings />} />
+          <Route path="/owner/inventory-valuation" element={<InventoryValuationDashboard />} />
           
           {/* Admin Routes (Web App) */}
           <Route path="/admin/dashboard" element={<AdminDashboard />} />

@@ -5,7 +5,7 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { Building2, Lock, User, UserCircle } from "lucide-react";
+import { Building2, Lock, User, UserCircle, PlayCircle } from "lucide-react";
 
 const UnifiedLogin = () => {
   const [username, setUsername] = useState("");
@@ -126,6 +126,22 @@ const UnifiedLogin = () => {
               >
                 Continue
               </Button>
+
+              {/* Demo Mode Button */}
+              <div className="mt-6 pt-6 border-t border-slate-200">
+                <Button 
+                  type="button"
+                  variant="outline"
+                  onClick={() => navigate('/demo')}
+                  className="w-full h-12 border-2 border-blue-500 text-blue-600 hover:bg-blue-50 hover:text-blue-700 font-medium transition-colors duration-200"
+                >
+                  <PlayCircle className="w-5 h-5 mr-2" />
+                  Quick Demo Mode
+                </Button>
+                <p className="text-xs text-center text-slate-500 mt-2">
+                  Explore key features without login
+                </p>
+              </div>
             </form>
           ) : (
             // Role Selection

@@ -23,6 +23,15 @@ db = client[os.environ['DB_NAME']]
 # Create the main app without a prefix
 app = FastAPI()
 
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
@@ -216,6 +225,26 @@ class InventoryItem(BaseModel):
     # TDF-specific fields (Berhane branch only)
     is_tdf: Optional[bool] = False  # True if product is made from TDF wheat
     tdf_source: Optional[str] = None  # "Tigray Defense Force" for TDF products
+    
+    # Cost Tracking & Valuation
+    estimated_unit_cost: Optional[float] = None  # From purchase requisition estimate
+    actual_unit_cost: Optional[float] = None  # Actual cost paid
+    current_unit_cost: Optional[float] = None  # Current cost for valuation (defaults to actual)
+    
+    # Selling Price (enhanced)
+    unit_selling_price: Optional[float] = None  # Price to customers (alias of unit_price)
+    min_selling_price: Optional[float] = None  # Minimum allowed price
+    
+    # Valuation (calculated fields)
+    total_inventory_value: Optional[float] = None  # quantity * current_unit_cost
+    total_selling_value: Optional[float] = None  # quantity * unit_selling_price
+    potential_profit: Optional[float] = None  # total_selling_value - total_inventory_value
+    profit_margin_percent: Optional[float] = None  # (potential_profit / total_inventory_value) * 100
+    
+    # Cost History
+    cost_history: List[Dict] = []  # Track cost changes over time
+    last_purchase_cost: Optional[float] = None
+    last_purchase_date: Optional[datetime] = None
 
 class InventoryItemCreate(BaseModel):
     name: str
@@ -310,6 +339,26 @@ class PurchaseRequisition(BaseModel):
     rejection_reason: Optional[str] = None
     rejected_by: Optional[str] = None
     rejected_at: Optional[datetime] = None
+    
+    # Enhanced Cost Tracking
+    quoted_cost: Optional[float] = None  # Actual quote from supplier
+    final_cost: Optional[float] = None  # Final amount paid (may differ from estimate)
+    
+    # Variance Tracking
+    cost_variance: Optional[float] = None  # final_cost - estimated_cost
+    cost_variance_percent: Optional[float] = None  # (variance / estimated_cost) * 100
+    cost_variance_reason: Optional[str] = None
+    
+    # Inventory Cost Details (for items that impact inventory)
+    inventory_items_estimated_cost: Optional[Dict] = None  # {item_id: {unit_cost, quantity, total}}
+    inventory_items_actual_cost: Optional[Dict] = None  # {item_id: {unit_cost, quantity, total}}
+    
+    # Finance Authorization
+    finance_authorized: Optional[bool] = False
+    finance_authorized_by: Optional[str] = None
+    finance_authorized_at: Optional[datetime] = None
+    finance_authorization_notes: Optional[str] = None
+    fund_request_id: Optional[str] = None  # Link to FundAuthorizationRequest if needed
 
 class PurchaseRequisitionCreate(BaseModel):
     description: str
@@ -810,6 +859,153 @@ class ExpenseRecordCreate(BaseModel):
     description: str
     supporting_documents: List[str] = []
     processed_by: str
+
+
+# Financial Control & Authorization Models
+class FinancialControlSettings(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    
+    # Authorization Thresholds
+    auto_approval_threshold: float = 100000  # Below this, Finance can process directly
+    owner_approval_threshold: float = 1000000  # Above this, Owner must approve
+    multi_signature_threshold: float = 5000000  # Owner + Admin required
+    
+    # Finance Spending Limits
+    daily_limit: Optional[float] = None  # Daily spending limit for Finance
+    monthly_limit: Optional[float] = None  # Monthly spending limit
+    
+    # Delegated Actions Configuration
+    delegated_categories: List[str] = []  # Categories Finance can auto-process
+    emergency_approval: bool = True  # Allow emergency processing with post-approval
+    
+    # Notifications
+    notify_owner_threshold: float = 500000  # Notify Owner for payments above this
+    
+    # Tracking
+    updated_by: str
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class FinancialControlSettingsUpdate(BaseModel):
+    auto_approval_threshold: Optional[float] = None
+    owner_approval_threshold: Optional[float] = None
+    multi_signature_threshold: Optional[float] = None
+    daily_limit: Optional[float] = None
+    monthly_limit: Optional[float] = None
+    delegated_categories: Optional[List[str]] = None
+    emergency_approval: Optional[bool] = None
+    notify_owner_threshold: Optional[float] = None
+    updated_by: str
+
+
+class FundAuthorizationRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    request_number: str
+    purchase_requisition_id: str
+    amount: float
+    requested_by: str  # Finance officer
+    requested_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    
+    # Justification
+    payment_urgency: str  # normal, urgent, emergency
+    justification: str
+    supporting_documents: List[str] = []
+    
+    # Owner Decision
+    status: str  # pending, approved, denied
+    owner_decision_by: Optional[str] = None
+    owner_decision_at: Optional[datetime] = None
+    owner_notes: Optional[str] = None
+    
+    # Limits Check
+    exceeds_threshold: bool
+    requires_multi_signature: bool
+    admin_co_signed: Optional[bool] = None
+    
+    # Spending Context
+    finance_officer_daily_spent: float
+    finance_officer_monthly_spent: float
+    remaining_daily_limit: Optional[float] = None
+    remaining_monthly_limit: Optional[float] = None
+    
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class FundAuthorizationCreate(BaseModel):
+    purchase_requisition_id: str
+    amount: float
+    requested_by: str
+    payment_urgency: str
+    justification: str
+    supporting_documents: List[str] = []
+
+class FundAuthorizationDecision(BaseModel):
+    status: str  # approved or denied
+    owner_decision_by: str
+    owner_notes: Optional[str] = None
+
+
+class MultiSignatureApproval(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    approval_number: str
+    purchase_requisition_id: str
+    amount: float
+    
+    # Required Signatures
+    required_signatures: List[str] = ["owner", "admin"]  # Configurable
+    
+    # Collected Signatures
+    signatures: List[Dict] = []  # {role, user, timestamp, approval_code}
+    
+    # Status
+    status: str  # pending, partially_signed, fully_signed, denied
+    completed_at: Optional[datetime] = None
+    
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class MultiSignatureSign(BaseModel):
+    role: str
+    user: str
+    approval_code: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class FinanceSpendingTracker(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    finance_officer: str
+    date: datetime
+    
+    # Daily Tracking
+    daily_spent: float = 0.0
+    daily_transactions: List[str] = []  # Transaction IDs
+    
+    # Monthly Tracking
+    monthly_spent: float = 0.0
+    monthly_transactions: List[str] = []
+    
+    # Limits
+    daily_limit: Optional[float] = None
+    monthly_limit: Optional[float] = None
+    
+    # Status
+    daily_limit_reached: bool = False
+    monthly_limit_reached: bool = False
+    
+    # Warnings
+    daily_warning_threshold: float = 0.8  # 80% of limit
+    monthly_warning_threshold: float = 0.8
+    
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # Helper function to serialize datetime fields
@@ -3040,13 +3236,23 @@ async def get_expense_summary(
 # Purchase Authorization Endpoints
 @api_router.get("/finance/pending-authorizations")
 async def get_pending_authorizations():
-    """Get owner-approved purchase requests needing finance authorization"""
+    """Get owner-approved purchase requests needing finance processing"""
     
-    # Get owner-approved purchase requisitions
+    # Get financial control settings
+    settings = await db.financial_control_settings.find_one({})
+    owner_threshold = settings.get("owner_approval_threshold", 1000000) if settings else 1000000
+    
+    # Get owner-approved and funds-approved purchase requisitions
     prs = await db.purchase_requisitions.find(
-        {"status": "owner_approved"},
+        {"status": {"$in": ["owner_approved", "funds_approved"]}},
         {"_id": 0}
     ).sort("requested_at", 1).to_list(100)
+    
+    # Enrich with threshold info
+    for pr in prs:
+        amount = pr.get("estimated_cost", 0)
+        pr["requires_fund_request"] = amount > owner_threshold and pr.get("status") == "owner_approved"
+        pr["can_process_directly"] = amount <= owner_threshold or pr.get("status") == "funds_approved"
     
     return prs
 
@@ -3100,8 +3306,48 @@ async def process_payment(pr_id: str, payment_details: Dict):
     if not pr:
         raise HTTPException(status_code=404, detail="Purchase requisition not found")
     
-    if pr.get("status") != "owner_approved":
-        raise HTTPException(status_code=400, detail="Purchase requisition must be owner-approved")
+    # Check if PR is in valid status for payment
+    valid_statuses = ["owner_approved", "funds_approved"]
+    if pr.get("status") not in valid_statuses:
+        raise HTTPException(status_code=400, detail=f"Purchase requisition must be owner-approved or funds-approved. Current status: {pr.get('status')}")
+    
+    # Get financial control settings
+    settings = await db.financial_control_settings.find_one({})
+    payment_amount = payment_details.get("amount", pr.get("estimated_cost"))
+    
+    # Check if amount requires fund authorization
+    if settings and payment_amount > settings.get("owner_approval_threshold", 1000000):
+        # Check if funds already approved
+        if pr.get("status") != "funds_approved":
+            raise HTTPException(
+                status_code=403, 
+                detail=f"Payment of ETB {payment_amount:,.0f} requires Owner fund authorization. Please submit fund request first."
+            )
+    
+    # Check daily/monthly limits
+    if settings:
+        finance_officer = payment_details.get("processed_by")
+        today = datetime.now(timezone.utc).date()
+        
+        # Get today's spending
+        daily_txns = await db.finance_transactions.find({
+            "processed_by": finance_officer,
+            "type": "expense",
+            "transaction_date": {
+                "$gte": datetime.combine(today, datetime.min.time()).isoformat(),
+                "$lte": datetime.combine(today, datetime.max.time()).isoformat()
+            }
+        }).to_list(1000)
+        
+        daily_spent = sum(txn.get("amount", 0) for txn in daily_txns)
+        
+        # Check daily limit
+        daily_limit = settings.get("daily_limit")
+        if daily_limit and (daily_spent + payment_amount) > daily_limit:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Payment would exceed daily limit. Spent: ETB {daily_spent:,.0f}, Limit: ETB {daily_limit:,.0f}, Remaining: ETB {daily_limit - daily_spent:,.0f}"
+            )
     
     # Generate finance transaction number
     txn_count = await db.finance_transactions.count_documents({})
@@ -3133,6 +3379,12 @@ async def process_payment(pr_id: str, payment_details: Dict):
     
     await db.finance_transactions.insert_one(finance_txn)
     
+    # Calculate cost variance
+    estimated = pr.get("estimated_cost", 0)
+    final = payment_amount
+    variance = final - estimated
+    variance_percent = (variance / estimated * 100) if estimated > 0 else 0
+    
     # Update purchase requisition status
     await db.purchase_requisitions.update_one(
         {"id": pr_id},
@@ -3145,6 +3397,9 @@ async def process_payment(pr_id: str, payment_details: Dict):
                 "payment_method": payment_details.get("payment_method"),
                 "payment_reference": payment_details.get("reference_number"),
                 "finance_transaction_id": finance_txn["id"],
+                "final_cost": final,
+                "cost_variance": variance,
+                "cost_variance_percent": variance_percent,
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }
         }
@@ -3577,6 +3832,730 @@ async def get_audit_trail(
     ).sort("timestamp", -1).limit(limit).to_list(limit)
     
     return audit_logs
+
+
+# ==================== FINANCIAL CONTROL SETTINGS ENDPOINTS ====================
+
+@api_router.get("/settings/financial-controls")
+async def get_financial_controls():
+    """Get current financial control settings"""
+    settings = await db.financial_control_settings.find_one({}, {"_id": 0})
+    
+    # If no settings exist, create default
+    if not settings:
+        default_settings = FinancialControlSettings(
+            updated_by="system",
+            auto_approval_threshold=100000,
+            owner_approval_threshold=1000000,
+            multi_signature_threshold=5000000,
+            daily_limit=5000000,
+            monthly_limit=50000000,
+            delegated_categories=[],
+            emergency_approval=True,
+            notify_owner_threshold=500000
+        )
+        await db.financial_control_settings.insert_one(serialize_datetime(default_settings.model_dump()))
+        return default_settings
+    
+    return settings
+
+
+@api_router.put("/settings/financial-controls")
+async def update_financial_controls(updates: FinancialControlSettingsUpdate):
+    """Owner updates financial control settings"""
+    
+    # Get current settings
+    current = await db.financial_control_settings.find_one({})
+    
+    if not current:
+        raise HTTPException(status_code=404, detail="Settings not found, create default first")
+    
+    # Build update dict
+    update_dict = {}
+    for field, value in updates.model_dump(exclude_unset=True).items():
+        if value is not None and field != "updated_by":
+            update_dict[field] = value
+    
+    update_dict["updated_by"] = updates.updated_by
+    update_dict["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    # Update
+    await db.financial_control_settings.update_one(
+        {"id": current["id"]},
+        {"$set": update_dict}
+    )
+    
+    # Audit log
+    await log_audit(
+        user=updates.updated_by,
+        action="update_financial_controls",
+        entity_type="financial_control_settings",
+        entity_id=current["id"],
+        details=update_dict
+    )
+    
+    updated = await db.financial_control_settings.find_one({"id": current["id"]}, {"_id": 0})
+    return updated
+
+
+# ==================== FUND AUTHORIZATION ENDPOINTS ====================
+
+@api_router.post("/finance/request-funds/{pr_id}")
+async def request_funds(pr_id: str, request: FundAuthorizationCreate):
+    """Finance requests Owner approval for funds"""
+    
+    # Get PR
+    pr = await db.purchase_requisitions.find_one({"id": pr_id}, {"_id": 0})
+    if not pr:
+        raise HTTPException(status_code=404, detail="Purchase requisition not found")
+    
+    # Get settings
+    settings = await db.financial_control_settings.find_one({})
+    if not settings:
+        raise HTTPException(status_code=404, detail="Financial controls not configured")
+    
+    # Get finance officer's spending
+    today = datetime.now(timezone.utc).date()
+    month_start = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    # Calculate daily spending
+    daily_txns = await db.finance_transactions.find({
+        "processed_by": request.requested_by,
+        "type": "expense",
+        "transaction_date": {
+            "$gte": datetime.combine(today, datetime.min.time()).isoformat(),
+            "$lte": datetime.combine(today, datetime.max.time()).isoformat()
+        }
+    }, {"_id": 0}).to_list(1000)
+    
+    daily_spent = sum(txn.get("amount", 0) for txn in daily_txns)
+    
+    # Calculate monthly spending
+    monthly_txns = await db.finance_transactions.find({
+        "processed_by": request.requested_by,
+        "type": "expense",
+        "transaction_date": {"$gte": month_start.isoformat()}
+    }, {"_id": 0}).to_list(10000)
+    
+    monthly_spent = sum(txn.get("amount", 0) for txn in monthly_txns)
+    
+    # Determine thresholds
+    exceeds_threshold = request.amount > settings.get("owner_approval_threshold", 1000000)
+    requires_multi_sig = request.amount > settings.get("multi_signature_threshold", 5000000)
+    
+    # Calculate remaining limits
+    remaining_daily = None
+    remaining_monthly = None
+    if settings.get("daily_limit"):
+        remaining_daily = settings["daily_limit"] - daily_spent
+    if settings.get("monthly_limit"):
+        remaining_monthly = settings["monthly_limit"] - monthly_spent
+    
+    # Generate request number
+    req_count = await db.fund_authorization_requests.count_documents({})
+    request_number = f"FUND-{req_count + 1:06d}"
+    
+    # Create fund request
+    fund_request = FundAuthorizationRequest(
+        request_number=request_number,
+        purchase_requisition_id=pr_id,
+        amount=request.amount,
+        requested_by=request.requested_by,
+        payment_urgency=request.payment_urgency,
+        justification=request.justification,
+        supporting_documents=request.supporting_documents,
+        status="pending",
+        exceeds_threshold=exceeds_threshold,
+        requires_multi_signature=requires_multi_sig,
+        finance_officer_daily_spent=daily_spent,
+        finance_officer_monthly_spent=monthly_spent,
+        remaining_daily_limit=remaining_daily,
+        remaining_monthly_limit=remaining_monthly
+    )
+    
+    # Save
+    await db.fund_authorization_requests.insert_one(serialize_datetime(fund_request.model_dump()))
+    
+    # Update PR
+    await db.purchase_requisitions.update_one(
+        {"id": pr_id},
+        {
+            "$set": {
+                "fund_request_id": fund_request.id,
+                "status": "funds_requested",
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+        }
+    )
+    
+    # Audit log
+    await log_audit(
+        user=request.requested_by,
+        action="request_funds",
+        entity_type="fund_authorization_request",
+        entity_id=fund_request.id,
+        details={
+            "pr_id": pr_id,
+            "amount": request.amount,
+            "urgency": request.payment_urgency
+        }
+    )
+    
+    return fund_request
+
+
+@api_router.get("/owner/pending-fund-requests")
+async def get_pending_fund_requests():
+    """Owner sees pending fund authorization requests"""
+    
+    requests = await db.fund_authorization_requests.find(
+        {"status": "pending"},
+        {"_id": 0}
+    ).sort("requested_at", 1).to_list(100)
+    
+    # Enrich with PR details
+    for req in requests:
+        pr = await db.purchase_requisitions.find_one(
+            {"id": req["purchase_requisition_id"]},
+            {"_id": 0, "description": 1, "request_number": 1, "vendor_name": 1}
+        )
+        if pr:
+            req["pr_details"] = pr
+    
+    return requests
+
+
+@api_router.post("/owner/approve-funds/{request_id}")
+async def approve_funds(request_id: str, decision: FundAuthorizationDecision):
+    """Owner approves fund release"""
+    
+    req = await db.fund_authorization_requests.find_one({"id": request_id}, {"_id": 0})
+    if not req:
+        raise HTTPException(status_code=404, detail="Fund request not found")
+    
+    # Update request
+    await db.fund_authorization_requests.update_one(
+        {"id": request_id},
+        {
+            "$set": {
+                "status": decision.status,
+                "owner_decision_by": decision.owner_decision_by,
+                "owner_decision_at": datetime.now(timezone.utc).isoformat(),
+                "owner_notes": decision.owner_notes,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+        }
+    )
+    
+    # Update PR status
+    pr_status = "funds_approved" if decision.status == "approved" else "funds_denied"
+    await db.purchase_requisitions.update_one(
+        {"id": req["purchase_requisition_id"]},
+        {
+            "$set": {
+                "status": pr_status,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+        }
+    )
+    
+    # Audit log
+    await log_audit(
+        user=decision.owner_decision_by,
+        action=f"fund_request_{decision.status}",
+        entity_type="fund_authorization_request",
+        entity_id=request_id,
+        details={
+            "amount": req["amount"],
+            "notes": decision.owner_notes
+        }
+    )
+    
+    return await db.fund_authorization_requests.find_one({"id": request_id}, {"_id": 0})
+
+
+@api_router.get("/owner/activity-feed")
+async def get_owner_activity_feed(limit: int = 50):
+    """
+    Owner's real-time activity feed - aggregates all operations across all roles
+    Returns a unified activity stream for monitoring
+    """
+    activities = []
+    
+    # 1. Sales Transactions (last 100)
+    sales_txns = await db.sales_transactions.find({}, {"_id": 0}).sort("timestamp", -1).limit(limit).to_list(limit)
+    for txn in sales_txns:
+        activities.append({
+            "id": txn.get("id"),
+            "timestamp": txn.get("timestamp"),
+            "role": "sales",
+            "action": "sale_transaction",
+            "description": f"Sale: {txn.get('customer_name', 'Customer')} - ETB {txn.get('total_amount', 0):,.0f}",
+            "branch": txn.get("branch_id", "unknown"),
+            "details": {
+                "transaction_number": txn.get("transaction_number"),
+                "payment_type": txn.get("payment_type"),
+                "items_count": len(txn.get("items", [])),
+                "amount": txn.get("total_amount")
+            }
+        })
+    
+    # 2. Milling Orders
+    milling_orders = await db.milling_orders.find({}, {"_id": 0}).sort("created_at", -1).limit(30).to_list(30)
+    for order in milling_orders:
+        activities.append({
+            "id": order.get("id"),
+            "timestamp": order.get("created_at"),
+            "role": "manager",
+            "action": "milling_order",
+            "description": f"Milling: {order.get('input_quantity', 0)}kg {order.get('wheat_quality', '')} → {order.get('flour_type', '')}",
+            "branch": order.get("branch_id", "unknown"),
+            "details": {
+                "order_number": order.get("order_number"),
+                "status": order.get("status"),
+                "flour_type": order.get("flour_type"),
+                "input_quantity": order.get("input_quantity")
+            }
+        })
+    
+    # 3. Stock Requests (Internal Orders)
+    stock_requests = await db.stock_requests.find({}, {"_id": 0}).sort("requested_at", -1).limit(30).to_list(30)
+    for req in stock_requests:
+        activities.append({
+            "id": req.get("id"),
+            "timestamp": req.get("requested_at"),
+            "role": "sales",
+            "action": "stock_request",
+            "description": f"Stock Request: {req.get('quantity', 0)}kg {req.get('product_name', '')} from {req.get('source_branch', '')}",
+            "branch": req.get("source_branch", "unknown"),
+            "details": {
+                "request_number": req.get("request_number"),
+                "status": req.get("status"),
+                "product_name": req.get("product_name"),
+                "quantity": req.get("quantity")
+            }
+        })
+    
+    # 4. Finance Transactions
+    finance_txns = await db.finance_transactions.find({}, {"_id": 0}).sort("created_at", -1).limit(30).to_list(30)
+    for txn in finance_txns:
+        activities.append({
+            "id": txn.get("id"),
+            "timestamp": txn.get("created_at"),
+            "role": "finance",
+            "action": f"finance_{txn.get('type', 'transaction')}",
+            "description": f"Finance {txn.get('type', '').title()}: {txn.get('description', 'Transaction')} - ETB {txn.get('amount', 0):,.0f}",
+            "branch": txn.get("branch_id", "both"),
+            "details": {
+                "type": txn.get("type"),
+                "account_type": txn.get("account_type"),
+                "amount": txn.get("amount"),
+                "processed_by": txn.get("processed_by")
+            }
+        })
+    
+    # 5. Purchase Requisitions
+    purchase_reqs = await db.purchase_requisitions.find({}, {"_id": 0}).sort("requested_at", -1).limit(20).to_list(20)
+    for pr in purchase_reqs:
+        activities.append({
+            "id": pr.get("id"),
+            "timestamp": pr.get("requested_at"),
+            "role": "manager" if pr.get("requested_by_role") == "manager" else "admin",
+            "action": "purchase_requisition",
+            "description": f"Purchase Request: {pr.get('description', '')} - ETB {pr.get('estimated_cost', 0):,.0f}",
+            "branch": "both",
+            "details": {
+                "request_number": pr.get("request_number"),
+                "status": pr.get("status"),
+                "vendor_name": pr.get("vendor_name"),
+                "estimated_cost": pr.get("estimated_cost")
+            }
+        })
+    
+    # 6. Wheat Deliveries
+    deliveries = await db.wheat_deliveries.find({}, {"_id": 0}).sort("delivery_date", -1).limit(20).to_list(20)
+    for delivery in deliveries:
+        activities.append({
+            "id": delivery.get("id"),
+            "timestamp": delivery.get("delivery_date"),
+            "role": "manager",
+            "action": "wheat_delivery",
+            "description": f"Wheat Delivery: {delivery.get('quantity_received', 0)}kg from {delivery.get('supplier_name', 'Supplier')}",
+            "branch": delivery.get("branch_id", "unknown"),
+            "details": {
+                "delivery_number": delivery.get("delivery_number"),
+                "quantity": delivery.get("quantity_received"),
+                "quality": delivery.get("quality_rating"),
+                "supplier": delivery.get("supplier_name")
+            }
+        })
+    
+    # 7. Audit Logs for other important actions
+    audit_logs = await db.audit_logs.find(
+        {"action": {"$in": ["inventory_adjustment", "user_created", "fulfillment_completed"]}},
+        {"_id": 0}
+    ).sort("timestamp", -1).limit(20).to_list(20)
+    for log in audit_logs:
+        role = "storekeeper" if "inventory" in log.get("action", "") or "fulfillment" in log.get("action", "") else "admin"
+        activities.append({
+            "id": log.get("id"),
+            "timestamp": log.get("timestamp"),
+            "role": role,
+            "action": log.get("action"),
+            "description": f"{log.get('action', '').replace('_', ' ').title()}: {log.get('entity_type', '')}",
+            "branch": log.get("details", {}).get("branch_id", "unknown"),
+            "details": log.get("details", {})
+        })
+    
+    # Sort all activities by timestamp (most recent first)
+    # Filter out activities without timestamps and handle None values
+    activities_with_time = [a for a in activities if a.get("timestamp")]
+    activities_with_time.sort(key=lambda x: x.get("timestamp", "1970-01-01T00:00:00"), reverse=True)
+    
+    # Return limited results
+    return activities_with_time[:limit]
+
+
+@api_router.get("/owner/dashboard-summary")
+async def get_owner_dashboard_summary():
+    """
+    Comprehensive dashboard summary for owner with all KPIs
+    """
+    # Get today's date range
+    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    tomorrow = today + timedelta(days=1)
+    
+    # 1. Financial Summary
+    finance_summary = await db.finance_transactions.aggregate([
+        {
+            "$group": {
+                "_id": "$type",
+                "total": {"$sum": "$amount"}
+            }
+        }
+    ]).to_list(10)
+    
+    total_income = sum(item["total"] for item in finance_summary if item["_id"] == "income")
+    total_expenses = sum(item["total"] for item in finance_summary if item["_id"] == "expense")
+    cash_balance = total_income - total_expenses
+    
+    # 2. Today's Sales
+    today_sales = await db.sales_transactions.find({
+        "timestamp": {
+            "$gte": today.isoformat(),
+            "$lt": tomorrow.isoformat()
+        }
+    }, {"_id": 0}).to_list(1000)
+    
+    todays_sales_amount = sum(txn.get("total_amount", 0) for txn in today_sales)
+    todays_transaction_count = len(today_sales)
+    
+    # 3. Accounts Receivable (Active Loans)
+    active_loans = await db.loans.find({"status": "active"}, {"_id": 0}).to_list(1000)
+    total_receivables = sum(loan.get("balance", 0) for loan in active_loans)
+    
+    # 4. Gross Profit (simplified: sales - cost basis)
+    # For accurate profit, we'd need to track COGS per transaction
+    gross_profit = todays_sales_amount * 0.3  # Placeholder: 30% margin
+    
+    # 5. Pending Fund Requests
+    pending_fund_requests = await db.fund_authorization_requests.count_documents({"status": "pending"})
+    
+    # 6. Inventory Valuation
+    inventory_items = await db.inventory.find({}, {"_id": 0}).to_list(10000)
+    total_inventory_value = sum(
+        item.get("quantity", 0) * (item.get("current_unit_cost") or item.get("actual_unit_cost") or 0)
+        for item in inventory_items
+    )
+    
+    # 7. Pending Approvals Count
+    pending_purchase_reqs = await db.purchase_requisitions.count_documents({
+        "status": {"$in": ["pending", "manager_approved", "admin_approved"]}
+    })
+    pending_stock_requests = await db.stock_requests.count_documents({
+        "status": {"$in": ["pending_admin_approval", "pending_manager_approval"]}
+    })
+    
+    return {
+        "financial_kpis": {
+            "cash_in_bank": cash_balance,
+            "todays_sales": todays_sales_amount,
+            "accounts_receivable": total_receivables,
+            "gross_profit": gross_profit,
+            "pending_fund_requests": pending_fund_requests,
+            "inventory_value": total_inventory_value
+        },
+        "operations": {
+            "todays_transaction_count": todays_transaction_count,
+            "pending_purchase_requisitions": pending_purchase_reqs,
+            "pending_stock_requests": pending_stock_requests,
+            "active_loans_count": len(active_loans)
+        },
+        "trends": {
+            "sales_trend": "+12%",  # Placeholder - would calculate from historical data
+            "profit_trend": "+8%",
+            "receivables_trend": "+15%"
+        }
+    }
+
+
+@api_router.get("/owner/branch-stats")
+async def get_owner_branch_stats(branch_id: Optional[str] = None):
+    """
+    Detailed statistics for branch comparison
+    Returns data for specific branch or all branches
+    """
+    branches = ["berhane", "girmay"] if not branch_id else [branch_id]
+    
+    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    tomorrow = today + timedelta(days=1)
+    
+    branch_stats = {}
+    
+    for branch in branches:
+        # Today's Sales
+        sales_txns = await db.sales_transactions.find({
+            "branch_id": branch,
+            "timestamp": {
+                "$gte": today.isoformat(),
+                "$lt": tomorrow.isoformat()
+            }
+        }, {"_id": 0}).to_list(1000)
+        
+        todays_sales = sum(txn.get("total_amount", 0) for txn in sales_txns)
+        transaction_count = len(sales_txns)
+        
+        # Today's Production
+        milling_orders = await db.milling_orders.find({
+            "branch_id": branch,
+            "created_at": {
+                "$gte": today.isoformat(),
+                "$lt": tomorrow.isoformat()
+            }
+        }, {"_id": 0}).to_list(100)
+        
+        todays_production = sum(order.get("output_quantity", 0) for order in milling_orders)
+        
+        # Current Inventory
+        inventory_items = await db.inventory.find({"branch_id": branch}, {"_id": 0}).to_list(1000)
+        finished_flour_qty = sum(
+            item.get("quantity", 0) for item in inventory_items 
+            if "flour" in item.get("name", "").lower() and item.get("category") == "finished_product"
+        )
+        
+        # Pending Stock Requests
+        pending_requests = await db.stock_requests.count_documents({
+            "source_branch": branch,
+            "status": {"$in": ["pending_admin_approval", "pending_manager_approval", "pending_fulfillment"]}
+        })
+        
+        # Active Milling Orders
+        active_milling = await db.milling_orders.count_documents({
+            "branch_id": branch,
+            "status": {"$in": ["pending", "in_progress"]}
+        })
+        
+        # Low Stock Items
+        low_stock_count = sum(
+            1 for item in inventory_items 
+            if item.get("stock_level") in ["low", "critical"]
+        )
+        
+        branch_stats[branch] = {
+            "todays_sales": todays_sales,
+            "todays_production": todays_production,
+            "current_inventory_kg": finished_flour_qty,
+            "pending_stock_requests": pending_requests,
+            "active_milling_orders": active_milling,
+            "transaction_count": transaction_count,
+            "low_stock_alerts": low_stock_count,
+            "operational_status": "active" if todays_production > 0 or transaction_count > 0 else "idle"
+        }
+    
+    if branch_id:
+        return branch_stats.get(branch_id, {})
+    
+    return branch_stats
+
+
+@api_router.get("/finance/spending-limits")
+async def get_spending_limits(finance_officer: str):
+    """Get current spending limits and usage for finance officer"""
+    
+    # Get settings
+    settings = await db.financial_control_settings.find_one({})
+    if not settings:
+        return {"error": "Financial controls not configured"}
+    
+    # Calculate today's spending
+    today = datetime.now(timezone.utc).date()
+    daily_txns = await db.finance_transactions.find({
+        "processed_by": finance_officer,
+        "type": "expense",
+        "transaction_date": {
+            "$gte": datetime.combine(today, datetime.min.time()).isoformat(),
+            "$lte": datetime.combine(today, datetime.max.time()).isoformat()
+        }
+    }, {"_id": 0}).to_list(1000)
+    
+    daily_spent = sum(txn.get("amount", 0) for txn in daily_txns)
+    
+    # Calculate month's spending
+    month_start = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    monthly_txns = await db.finance_transactions.find({
+        "processed_by": finance_officer,
+        "type": "expense",
+        "transaction_date": {"$gte": month_start.isoformat()}
+    }, {"_id": 0}).to_list(10000)
+    
+    monthly_spent = sum(txn.get("amount", 0) for txn in monthly_txns)
+    
+    daily_limit = settings.get("daily_limit")
+    monthly_limit = settings.get("monthly_limit")
+    
+    return {
+        "finance_officer": finance_officer,
+        "daily_spent": daily_spent,
+        "daily_limit": daily_limit,
+        "daily_remaining": (daily_limit - daily_spent) if daily_limit else None,
+        "daily_limit_reached": daily_spent >= daily_limit if daily_limit else False,
+        "monthly_spent": monthly_spent,
+        "monthly_limit": monthly_limit,
+        "monthly_remaining": (monthly_limit - monthly_spent) if monthly_limit else None,
+        "monthly_limit_reached": monthly_spent >= monthly_limit if monthly_limit else False,
+        "thresholds": {
+            "auto_approval": settings.get("auto_approval_threshold"),
+            "owner_approval": settings.get("owner_approval_threshold"),
+            "multi_signature": settings.get("multi_signature_threshold")
+        }
+    }
+
+
+# ==================== INVENTORY VALUATION ENDPOINTS ====================
+
+@api_router.get("/inventory/valuation")
+async def get_inventory_valuation(branch_id: Optional[str] = None):
+    """Get total inventory value by branch"""
+    
+    query = {}
+    if branch_id:
+        query["branch_id"] = branch_id
+    
+    items = await db.inventory.find(query, {"_id": 0}).to_list(10000)
+    
+    branch_valuations = {}
+    total_inventory_value = 0.0
+    total_selling_value = 0.0
+    
+    for item in items:
+        branch = item.get("branch_id", "unknown")
+        quantity = item.get("quantity", 0)
+        unit_cost = item.get("current_unit_cost") or item.get("actual_unit_cost") or 0
+        unit_price = item.get("unit_selling_price") or item.get("unit_price") or 0
+        
+        inventory_value = quantity * unit_cost
+        selling_value = quantity * unit_price
+        
+        if branch not in branch_valuations:
+            branch_valuations[branch] = {
+                "inventory_value": 0.0,
+                "selling_value": 0.0,
+                "potential_profit": 0.0,
+                "item_count": 0
+            }
+        
+        branch_valuations[branch]["inventory_value"] += inventory_value
+        branch_valuations[branch]["selling_value"] += selling_value
+        branch_valuations[branch]["potential_profit"] += (selling_value - inventory_value)
+        branch_valuations[branch]["item_count"] += 1
+        
+        total_inventory_value += inventory_value
+        total_selling_value += selling_value
+    
+    return {
+        "by_branch": branch_valuations,
+        "total_inventory_value": total_inventory_value,
+        "total_selling_value": total_selling_value,
+        "total_potential_profit": total_selling_value - total_inventory_value,
+        "profit_margin_percent": ((total_selling_value - total_inventory_value) / total_inventory_value * 100) if total_inventory_value > 0 else 0
+    }
+
+
+@api_router.get("/inventory/valuation/summary")
+async def get_inventory_valuation_summary():
+    """Overall inventory worth summary"""
+    
+    items = await db.inventory.find({}, {"_id": 0}).to_list(10000)
+    
+    by_category = {}
+    total_value = 0.0
+    
+    for item in items:
+        category = item.get("category", "uncategorized")
+        quantity = item.get("quantity", 0)
+        unit_cost = item.get("current_unit_cost") or item.get("actual_unit_cost") or 0
+        
+        value = quantity * unit_cost
+        
+        if category not in by_category:
+            by_category[category] = {"value": 0.0, "items": 0}
+        
+        by_category[category]["value"] += value
+        by_category[category]["items"] += 1
+        total_value += value
+    
+    return {
+        "total_inventory_value": total_value,
+        "by_category": by_category,
+        "item_count": len(items)
+    }
+
+
+@api_router.put("/inventory/{item_id}/pricing")
+async def update_inventory_pricing(item_id: str, pricing: Dict):
+    """Update item pricing"""
+    
+    item = await db.inventory.find_one({"id": item_id}, {"_id": 0})
+    if not item:
+        raise HTTPException(status_code=404, detail="Inventory item not found")
+    
+    update_fields = {}
+    
+    # Update costs
+    if "estimated_unit_cost" in pricing:
+        update_fields["estimated_unit_cost"] = pricing["estimated_unit_cost"]
+    if "actual_unit_cost" in pricing:
+        update_fields["actual_unit_cost"] = pricing["actual_unit_cost"]
+        update_fields["current_unit_cost"] = pricing["actual_unit_cost"]  # Default current to actual
+    if "current_unit_cost" in pricing:
+        update_fields["current_unit_cost"] = pricing["current_unit_cost"]
+    
+    # Update selling prices
+    if "unit_selling_price" in pricing:
+        update_fields["unit_selling_price"] = pricing["unit_selling_price"]
+        update_fields["unit_price"] = pricing["unit_selling_price"]  # Keep legacy field in sync
+    if "min_selling_price" in pricing:
+        update_fields["min_selling_price"] = pricing["min_selling_price"]
+    
+    # Recalculate valuations
+    quantity = item.get("quantity", 0)
+    current_cost = update_fields.get("current_unit_cost", item.get("current_unit_cost", 0))
+    selling_price = update_fields.get("unit_selling_price", item.get("unit_selling_price", 0))
+    
+    update_fields["total_inventory_value"] = quantity * current_cost
+    update_fields["total_selling_value"] = quantity * selling_price
+    update_fields["potential_profit"] = (quantity * selling_price) - (quantity * current_cost)
+    if current_cost > 0:
+        update_fields["profit_margin_percent"] = ((selling_price - current_cost) / current_cost) * 100
+    
+    update_fields["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    await db.inventory.update_one(
+        {"id": item_id},
+        {"$set": update_fields}
+    )
+    
+    return await db.inventory.find_one({"id": item_id}, {"_id": 0})
 
 
 @api_router.get("/recent-activity")

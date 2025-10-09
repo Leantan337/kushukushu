@@ -27,6 +27,7 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useToast } from '../../hooks/use-toast';
 import { useAppContext } from '../../context/AppContext';
+import FinanceFundRequestForm from './FinanceFundRequestForm';
 
 const PaymentProcessing = () => {
   const navigate = useNavigate();
@@ -39,6 +40,8 @@ const PaymentProcessing = () => {
   const [processing, setProcessing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [approvedRequisitions, setApprovedRequisitions] = useState([]);
+  const [showFundRequestForm, setShowFundRequestForm] = useState(false);
+  const [spendingLimits, setSpendingLimits] = useState(null);
   
   const [paymentDetails, setPaymentDetails] = useState({
     paymentMethod: '',
@@ -53,6 +56,7 @@ const PaymentProcessing = () => {
 
   useEffect(() => {
     loadPendingAuthorizations();
+    loadSpendingLimits();
   }, []);
 
   useEffect(() => {
@@ -80,6 +84,43 @@ const PaymentProcessing = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadSpendingLimits = async () => {
+    try {
+      const financeOfficer = currentUser?.username || 'Finance Officer';
+      const response = await fetch(`${BACKEND_URL}/api/finance/spending-limits?finance_officer=${financeOfficer}`);
+      if (response.ok) {
+        const data = await response.json();
+        setSpendingLimits(data);
+      }
+    } catch (error) {
+      console.error('Error loading spending limits:', error);
+    }
+  };
+
+  const checkPaymentThreshold = (pr) => {
+    if (!pr) return null;
+    
+    const amount = pr.estimated_cost;
+    
+    // Check if PR already marked as requiring fund request
+    if (pr.requires_fund_request) {
+      return {
+        needsFundRequest: true,
+        message: `Amount of ETB ${amount.toLocaleString()} requires Owner fund authorization`
+      };
+    }
+    
+    // Check if already funds-approved
+    if (pr.status === 'funds_approved' || pr.can_process_directly) {
+      return {
+        needsFundRequest: false,
+        canProcess: true
+      };
+    }
+    
+    return { canProcess: true };
   };
 
   const handleProcessPayment = async () => {
@@ -287,9 +328,54 @@ const PaymentProcessing = () => {
                   <AlertCircle className="w-12 h-12 mx-auto mb-4 text-slate-400" />
                   <p className="text-slate-600">Select a requisition to process payment</p>
                 </div>
+              ) : showFundRequestForm ? (
+                <FinanceFundRequestForm
+                  purchaseRequisition={selectedRequisition}
+                  onClose={() => setShowFundRequestForm(false)}
+                  onSuccess={() => {
+                    setShowFundRequestForm(false);
+                    setSelectedRequisition(null);
+                    loadPendingAuthorizations();
+                  }}
+                />
               ) : (
                 <div className="space-y-6">
                   
+                  {/* Threshold Check Alert */}
+                  {selectedRequisition.requires_fund_request && selectedRequisition.status !== 'funds_approved' && (
+                    <div className="bg-amber-50 border border-amber-300 rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="w-6 h-6 text-amber-600 mt-0.5" />
+                        <div>
+                          <h3 className="font-semibold text-amber-900 mb-1">Owner Fund Authorization Required</h3>
+                          <p className="text-sm text-amber-700">
+                            This payment of {formatCurrency(selectedRequisition.estimated_cost)} exceeds your authorization threshold. 
+                            You must request Owner approval before processing.
+                          </p>
+                          <Button
+                            className="mt-3 bg-amber-600 hover:bg-amber-700 text-white"
+                            size="sm"
+                            onClick={() => setShowFundRequestForm(true)}
+                          >
+                            <Send className="w-4 h-4 mr-2" />
+                            Request Fund Authorization
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedRequisition.status === 'funds_approved' && (
+                    <div className="bg-green-50 border border-green-300 rounded-lg p-4">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-5 h-5 text-green-600" />
+                        <p className="text-sm font-semibold text-green-900">
+                          Funds Approved by Owner - Ready to Process
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Requisition Summary */}
                   <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
                     <h3 className="font-semibold text-slate-900 mb-3">Requisition Summary</h3>
@@ -301,6 +387,12 @@ const PaymentProcessing = () => {
                       <div className="flex justify-between">
                         <span className="text-slate-600">Description:</span>
                         <span className="font-medium">{selectedRequisition.description}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-600">Status:</span>
+                        <Badge variant={selectedRequisition.status === 'funds_approved' ? 'success' : 'default'}>
+                          {selectedRequisition.status}
+                        </Badge>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-600">Amount to Pay:</span>
@@ -414,7 +506,12 @@ const PaymentProcessing = () => {
                     <Button
                       className="flex-1 bg-green-600 hover:bg-green-700 text-white"
                       onClick={handleProcessPayment}
-                      disabled={processing || !paymentDetails.paymentMethod || !paymentDetails.bankAccount}
+                      disabled={
+                        processing || 
+                        !paymentDetails.paymentMethod || 
+                        !paymentDetails.bankAccount ||
+                        (selectedRequisition.requires_fund_request && selectedRequisition.status !== 'funds_approved')
+                      }
                     >
                       {processing ? (
                         <>
