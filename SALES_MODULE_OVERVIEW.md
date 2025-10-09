@@ -435,7 +435,7 @@ npm start
 
 # Access
 # Frontend: http://localhost:3000
-# Backend: http://localhost:8001
+# Backend: http://localhost:8000
 ```
 
 ### Environment Variables
@@ -446,7 +446,7 @@ DB_NAME=flour_factory_erp
 CORS_ORIGINS=http://localhost:3000
 
 # Frontend (.env)
-REACT_APP_BACKEND_URL=http://localhost:8001
+REACT_APP_BACKEND_URL=http://localhost:8000
 ```
 
 ---
@@ -479,7 +479,7 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 #### "Backend not connecting"
 ```bash
 # Check if backend is running
-curl http://localhost:8001/api/
+curl http://localhost:8000/api/
 
 # Check MongoDB
 mongo --eval "db.serverStatus()"

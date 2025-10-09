@@ -14,9 +14,31 @@ const ManagerStockApprovals = () => {
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 
-  useEffect(() => {
+  // Get current user from localStorage
+  const getUserInfo = () => {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      return {
+        id: `manager-${user.branch}`,
+        name: user.name || user.username,
+        branch_id: user.branch,
+        branch_name: user.branch === "berhane" ? "Berhane Branch" : "Girmay Branch"
+      };
+    }
+    return {
+      id: "manager-001",
+      name: "Manager",
+      branch_id: "berhane",
+      branch_name: "Berhane Branch"
+    };
+  };
+
+  const currentManager = getUserInfo();
+
+   useEffect(() => {
     fetchPendingRequests();
     const interval = setInterval(fetchPendingRequests, 30000);
     return () => clearInterval(interval);
@@ -24,10 +46,13 @@ const ManagerStockApprovals = () => {
 
   const fetchPendingRequests = async () => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/stock-requests?status=pending_manager_approval`);
+      // Filter by manager's branch
+      const response = await fetch(`${BACKEND_URL}/api/stock-requests?status=pending_manager_approval&branch_id=${currentManager.branch_id}`);
       if (response.ok) {
         const data = await response.json();
-        setRequests(data);
+        // Ensure we only show requests for this manager's branch
+        const branchRequests = data.filter(req => req.source_branch === currentManager.branch_id);
+        setRequests(branchRequests);
       }
     } catch (error) {
       console.error("Error fetching requests:", error);
@@ -41,7 +66,7 @@ const ManagerStockApprovals = () => {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          approved_by: "Manager User", // Replace with actual user
+          approved_by: currentManager.name,
           notes: notes || "Approved - capacity verified"
         })
       });
@@ -89,7 +114,7 @@ const ManagerStockApprovals = () => {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          rejected_by: "Manager User",
+          rejected_by: currentManager.name,
           reason: notes,
           stage: "manager_approval"
         })
@@ -129,8 +154,11 @@ const ManagerStockApprovals = () => {
           <CardTitle className="text-slate-900 flex items-center gap-2">
             <Factory className="w-6 h-6 text-purple-500" />
             Manager Stock Approvals
+            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 ml-2">
+              {currentManager.branch_name}
+            </Badge>
           </CardTitle>
-          <CardDescription>Review stock requests approved by Admin - verify production capacity</CardDescription>
+          <CardDescription>Review stock requests approved by Admin - verify production capacity for your branch</CardDescription>
         </CardHeader>
         <CardContent>
           {requests.length === 0 ? (

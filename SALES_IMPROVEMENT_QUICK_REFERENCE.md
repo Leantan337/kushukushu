@@ -227,7 +227,7 @@ db.createCollection("orders")
 
 **3. Environment Variables:**
 ```env
-REACT_APP_BACKEND_URL=http://localhost:8001
+REACT_APP_BACKEND_URL=http://localhost:8000
 MONGO_URL=mongodb://localhost:27017
 DB_NAME=flour_factory_erp
 ```

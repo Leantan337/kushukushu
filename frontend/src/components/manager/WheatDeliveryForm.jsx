@@ -22,7 +22,7 @@ const WheatDeliveryForm = ({ manager, onSuccess, onCancel }) => {
     setMessage({ type: '', text: '' });
 
     try {
-      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
       
       const deliveryData = {
         supplier_name: formData.supplier_name,
@@ -32,7 +32,7 @@ const WheatDeliveryForm = ({ manager, onSuccess, onCancel }) => {
         branch_id: manager.branch_id
       };
 
-      const response = await fetch(`${backendUrl}/wheat-deliveries`, {
+      const response = await fetch(`${backendUrl}/api/wheat-deliveries`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

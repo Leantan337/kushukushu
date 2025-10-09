@@ -55,7 +55,7 @@ const InternalOrderRequisitions = ({ userRole = "sales", userBranch = null }) =>
 
   const fetchOrders = async () => {
     try {
-      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
       
       // For storekeepers, fetch stock requests for their branch only
       let url = `${backendUrl}/api/internal-orders`;
@@ -153,14 +153,17 @@ const InternalOrderRequisitions = ({ userRole = "sales", userBranch = null }) =>
   };
 
   const canApprove = (order) => {
+    if (!order) return false;
     return (userRole === "manager" || userRole === "admin") && order.status === "pending_approval";
   };
 
   const canFulfill = (order) => {
+    if (!order) return false;
     return userRole === "store_keeper" && order.status === "approved";
   };
 
   const canReject = (order) => {
+    if (!order) return false;
     return (userRole === "manager" || userRole === "admin" || userRole === "store_keeper") && 
            !['fulfilled', 'rejected'].includes(order.status);
   };
@@ -173,7 +176,7 @@ const InternalOrderRequisitions = ({ userRole = "sales", userBranch = null }) =>
 
     setLoading(true);
     try {
-      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
       const response = await fetch(`${backendUrl}/internal-orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -204,7 +207,7 @@ const InternalOrderRequisitions = ({ userRole = "sales", userBranch = null }) =>
   const handleApprove = async () => {
     setLoading(true);
     try {
-      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
       const response = await fetch(`${backendUrl}/internal-orders/${selectedOrder.id}/approve`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -234,7 +237,7 @@ const InternalOrderRequisitions = ({ userRole = "sales", userBranch = null }) =>
 
     setLoading(true);
     try {
-      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
       const response = await fetch(`${backendUrl}/internal-orders/${selectedOrder.id}/fulfill`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -267,7 +270,7 @@ const InternalOrderRequisitions = ({ userRole = "sales", userBranch = null }) =>
 
     setLoading(true);
     try {
-      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
       const response = await fetch(`${backendUrl}/internal-orders/${selectedOrder.id}/reject`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },

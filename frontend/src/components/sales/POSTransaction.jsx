@@ -18,31 +18,40 @@ const POSTransaction = () => {
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [currentBranch, setCurrentBranch] = useState("berhane"); // User's branch
+  const [selectedBranch, setSelectedBranch] = useState("all"); // Allow selecting which branch to view
 
   useEffect(() => {
     fetchProducts();
-  }, [currentBranch]); // Refetch when branch changes
+  }, [selectedBranch]); // Refetch when branch filter changes
 
   const fetchProducts = async () => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/inventory`);
+      // Fetch products from ALL branches or specific branch
+      const url = selectedBranch === "all" 
+        ? `${BACKEND_URL}/api/inventory`
+        : `${BACKEND_URL}/api/inventory?branch_id=${selectedBranch}`;
+        
+      const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
-        // Filter products for current branch only and exclude service items
-        const branchProducts = data.filter(item => 
-          item.branch_id === currentBranch &&
-          item.is_sellable !== false &&  // Exclude TDF service items
-          item.category !== "service" &&  // Exclude service category
-          (item.category === "flour" || item.category === "bran")
+        // Filter sellable products only (exclude service items and raw wheat)
+        const sellableProducts = data.filter(item => 
+          item.is_sellable !== false &&
+          item.category !== "service" &&
+          item.name !== "Raw Wheat"
         );
-        setProducts(branchProducts);
+        setProducts(sellableProducts);
       }
     } catch (error) {
       console.error("Error fetching products:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load products. Please refresh the page.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -60,7 +69,7 @@ const POSTransaction = () => {
         product_name: product.name,
         quantity: 1,
         unit_price: product.unit_price || 50,
-        available_stock: product.current_stock
+        available_stock: product.quantity || product.current_stock || 0
       }]);
     }
   };
@@ -106,12 +115,21 @@ const POSTransaction = () => {
 
     setLoading(true);
     try {
+      // Transform cart items to match backend schema
+      const transformedItems = cartItems.map(item => ({
+        product_id: item.product_id,
+        product_name: item.product_name,
+        quantity_kg: item.quantity,
+        unit_price: item.unit_price,
+        total_price: item.quantity * item.unit_price
+      }));
+
       const transaction = {
-        items: cartItems,
+        items: transformedItems,
         payment_type: paymentType,
         sales_person_id: "SALES-001", // Replace with actual user ID
         sales_person_name: "Sales User", // Replace with actual user name
-        branch_id: currentBranch,
+        branch_id: selectedBranch === "all" ? "berhane" : selectedBranch,
         customer_id: paymentType === "loan" ? customerPhone : null,
         customer_name: paymentType === "loan" ? customerName : null,
         notes: notes || null
@@ -125,16 +143,27 @@ const POSTransaction = () => {
 
       if (response.ok) {
         const data = await response.json();
+        
+        // Show different messages based on payment type
+        let successMessage = `Transaction ${data.transaction_number} completed successfully`;
+        if (paymentType === "loan") {
+          successMessage += `. Loan created for ${customerName}. View in Loan Management.`;
+        } else {
+          successMessage += `. Payment recorded via ${paymentType.toUpperCase()}. View in Order Management.`;
+        }
+        
         toast({
-          title: "Success",
-          description: `Transaction ${data.transaction_number} completed successfully`,
+          title: "✅ Sale Processed",
+          description: successMessage,
         });
+        
         // Reset form
         setCartItems([]);
         setPaymentType("cash");
         setCustomerName("");
         setCustomerPhone("");
         setNotes("");
+        fetchProducts(); // Refresh inventory
       } else {
         const error = await response.json();
         toast({
@@ -165,11 +194,12 @@ const POSTransaction = () => {
               <CardDescription>Select products to add to cart</CardDescription>
             </div>
             {/* Branch Selector */}
-            <Select value={currentBranch} onValueChange={setCurrentBranch}>
+            <Select value={selectedBranch} onValueChange={setSelectedBranch}>
               <SelectTrigger className="w-48">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="all">All Branches</SelectItem>
                 <SelectItem value="berhane">Berhane Branch</SelectItem>
                 <SelectItem value="girmay">Girmay Branch</SelectItem>
               </SelectContent>
@@ -207,8 +237,10 @@ const POSTransaction = () => {
           {/* Branch Info */}
           <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded">
             <p className="text-xs text-blue-900">
-              <span className="font-semibold">Showing products from:</span> {currentBranch === "berhane" ? "Berhane Branch" : "Girmay Branch"} 
-              {" "}({filteredProducts.length} products available)
+              <span className="font-semibold">Showing products from:</span> {
+                selectedBranch === "all" ? "All Branches" :
+                selectedBranch === "berhane" ? "Berhane Branch" : "Girmay Branch"
+              } {" "}({filteredProducts.length} products available)
             </p>
           </div>
         </CardHeader>
@@ -233,7 +265,7 @@ const POSTransaction = () => {
                     product.stock_level === "low" ? "bg-yellow-100 text-yellow-700" :
                     "bg-red-100 text-red-700"
                   }`}>
-                    {product.quantity || product.current_stock} {product.unit}
+                    {product.quantity || product.current_stock || 0} {product.unit}
                   </span>
                 </div>
                 {product.packages_available > 0 && (
@@ -256,7 +288,7 @@ const POSTransaction = () => {
                     onClick={() => addToCart(product)}
                     size="sm"
                     className="bg-blue-500 hover:bg-blue-600"
-                    disabled={product.quantity <= 0 || product.stock_level === "critical"}
+                    disabled={(product.quantity || product.current_stock || 0) <= 0 || product.stock_level === "critical"}
                   >
                     <Plus className="w-4 h-4 mr-1" />
                     Add

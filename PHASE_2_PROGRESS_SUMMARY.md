@@ -484,7 +484,7 @@ cd backend
 python server.py
 
 # 2. Create a stock request
-curl -X POST http://localhost:8001/api/stock-requests \
+curl -X POST http://localhost:8000/api/stock-requests \
   -H "Content-Type: application/json" \
   -d '{
     "product_name": "1st Quality 50kg",
@@ -495,10 +495,10 @@ curl -X POST http://localhost:8001/api/stock-requests \
   }'
 
 # 3. List pending requests
-curl http://localhost:8001/api/stock-requests?status=pending_admin_approval
+curl http://localhost:8000/api/stock-requests?status=pending_admin_approval
 
 # 4. Approve as admin
-curl -X PUT http://localhost:8001/api/stock-requests/{id}/approve-admin \
+curl -X PUT http://localhost:8000/api/stock-requests/{id}/approve-admin \
   -H "Content-Type: application/json" \
   -d '{"approved_by": "test_admin", "notes": "Approved"}'
 ```

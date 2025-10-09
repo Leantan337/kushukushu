@@ -19,7 +19,7 @@ const UnifiedLogin = () => {
     { value: "owner", label: "Owner", route: "/dashboard" },
     { value: "admin", label: "Admin", route: "/admin/dashboard" },
     { value: "finance", label: "Finance", route: "/finance/dashboard" },
-    { value: "manager", label: "Manager", route: "/manager/dashboard" },
+    { value: "manager", label: "Manager", route: "/manager/dashboard", needsBranch: true },
     { value: "sales", label: "Sales", route: "/sales/dashboard" },
     { value: "storekeeper", label: "Store Keeper", route: "/storekeeper/dashboard", needsBranch: true }
   ];
@@ -153,8 +153,8 @@ const UnifiedLogin = () => {
                 </Select>
               </div>
 
-              {/* Show branch selection only for storekeeper role */}
-              {selectedRole === "storekeeper" && (
+              {/* Show branch selection for roles that need it */}
+              {(selectedRole === "storekeeper" || selectedRole === "manager") && (
                 <div className="space-y-2">
                   <Label htmlFor="branch" className="text-slate-700 font-medium flex items-center">
                     <Building2 className="w-5 h-5 mr-2" />
@@ -173,7 +173,9 @@ const UnifiedLogin = () => {
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-slate-500 mt-1">
-                    You will only see products and orders for your selected branch
+                    {selectedRole === "manager" 
+                      ? "You will manage operations for your selected branch" 
+                      : "You will only see products and orders for your selected branch"}
                   </p>
                 </div>
               )}
@@ -192,7 +194,7 @@ const UnifiedLogin = () => {
                 </Button>
                 <Button 
                   onClick={handleRoleSelection}
-                  disabled={!selectedRole || (selectedRole === "storekeeper" && !selectedBranch)}
+                  disabled={!selectedRole || ((selectedRole === "storekeeper" || selectedRole === "manager") && !selectedBranch)}
                   className="flex-1 h-12 bg-slate-900 hover:bg-slate-800 text-white font-medium transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Login

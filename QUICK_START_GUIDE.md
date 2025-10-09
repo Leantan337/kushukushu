@@ -12,7 +12,7 @@
 cd backend
 python server.py
 ```
-✅ Backend running on `http://localhost:8001`
+✅ Backend running on `http://localhost:8000`
 
 ### Step 2: Add New Products (One-Time)
 ```bash
@@ -105,32 +105,32 @@ npm start
 
 ### Test Recent Activity
 ```bash
-curl http://localhost:8001/api/recent-activity
+curl http://localhost:8000/api/recent-activity
 ```
 
 ### Test Finance Summary
 ```bash
-curl http://localhost:8001/api/finance/summary
+curl http://localhost:8000/api/finance/summary
 ```
 
 ### Test Stock Requests
 ```bash
-curl http://localhost:8001/api/stock-requests
+curl http://localhost:8000/api/stock-requests
 ```
 
 ### Test Loans
 ```bash
-curl http://localhost:8001/api/loans
+curl http://localhost:8000/api/loans
 ```
 
 ### Test Overdue Loans
 ```bash
-curl http://localhost:8001/api/loans/overdue
+curl http://localhost:8000/api/loans/overdue
 ```
 
 ### Test Loan Aging Report
 ```bash
-curl http://localhost:8001/api/reports/loan-aging
+curl http://localhost:8000/api/reports/loan-aging
 ```
 
 ---
@@ -281,7 +281,7 @@ python add_new_products.py
 ## 📞 Quick Reference
 
 ### Default Ports
-- Backend: `http://localhost:8001`
+- Backend: `http://localhost:8000`
 - Frontend: `http://localhost:3000`
 - MongoDB: `mongodb://localhost:27017`
 
@@ -299,7 +299,7 @@ python add_new_products.py
 ## ✅ Quick Validation
 
 Before proceeding, verify:
-- [ ] Backend running (check `http://localhost:8001/api/`)
+- [ ] Backend running (check `http://localhost:8000/api/`)
 - [ ] Frontend running (check `http://localhost:3000`)
 - [ ] MongoDB connected
 - [ ] Products seeded (run `add_new_products.py`)

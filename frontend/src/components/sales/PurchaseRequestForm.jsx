@@ -23,7 +23,7 @@ const PurchaseRequestForm = () => {
   });
   const [loading, setLoading] = useState(false);
 
-  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 
   const commonRequests = [
     { label: "Office Supplies", description: "Pens, paper, folders, etc.", estimatedCost: "2500" },

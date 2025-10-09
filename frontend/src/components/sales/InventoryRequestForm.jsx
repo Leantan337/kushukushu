@@ -10,17 +10,18 @@ import { useToast } from "../../hooks/use-toast";
 
 const InventoryRequestForm = () => {
   const { toast } = useToast();
+  
   const [formData, setFormData] = useState({
     product_name: "",
     package_size: "50kg",
     num_packages: "",
     reason: "",
-    branch_id: "berhane" // User's sales branch
+    branch_id: "berhane" // Sales chooses which branch to request from
   });
   const [loading, setLoading] = useState(false);
   const [availableProducts, setAvailableProducts] = useState([]);
 
-  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 
   // Package size options
   const packageSizes = [
@@ -31,25 +32,30 @@ const InventoryRequestForm = () => {
 
   useEffect(() => {
     fetchAvailableProducts();
-  }, []);
+  }, [formData.branch_id]); // Refetch when branch changes
 
   const fetchAvailableProducts = async () => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/inventory`);
+      // Fetch products from the selected branch
+      const response = await fetch(`${BACKEND_URL}/api/inventory?branch_id=${formData.branch_id}`);
       if (response.ok) {
         const data = await response.json();
-        // Get unique products (excluding service items)
+        // Get unique products (excluding service items and raw wheat)
         const products = data
-          .filter(item => item.is_sellable !== false && item.category !== "service")
+          .filter(item => 
+            item.is_sellable !== false && 
+            item.category !== "service" &&
+            item.name !== "Raw Wheat"
+          )
           .map(item => ({
             value: item.name,
-            label: `${item.name} (${item.branch_name})`,
-            branch: item.branch_id
+            label: item.name,
+            available: item.quantity
           }));
         
         // Remove duplicates by name
         const unique = products.filter((product, index, self) =>
-          index === self.findIndex((p) => p.value === product.value && p.branch === product.branch)
+          index === self.findIndex((p) => p.value === product.value)
         );
         
         setAvailableProducts(unique);
@@ -59,6 +65,11 @@ const InventoryRequestForm = () => {
       }
     } catch (error) {
       console.error("Error fetching products:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load available products",
+        variant: "destructive"
+      });
     }
   };
 
@@ -86,11 +97,15 @@ const InventoryRequestForm = () => {
 
     setLoading(true);
     try {
+      // Get user name from localStorage
+      const userStr = localStorage.getItem('user');
+      const userName = userStr ? JSON.parse(userStr).name || JSON.parse(userStr).username : "Sales User";
+      
       const request = {
         product_name: formData.product_name,
         package_size: formData.package_size,
         quantity: parseInt(formData.num_packages),
-        requested_by: "Sales User", // Replace with actual user
+        requested_by: userName,
         branch_id: formData.branch_id,
         reason: formData.reason
       };
@@ -150,6 +165,26 @@ const InventoryRequestForm = () => {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Branch Selection */}
+            <div className="space-y-2">
+              <Label htmlFor="branch_id">Request From Branch</Label>
+              <Select 
+                value={formData.branch_id} 
+                onValueChange={(value) => handleChange("branch_id", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="berhane">Berhane Branch</SelectItem>
+                  <SelectItem value="girmay">Girmay Branch</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-slate-500">
+                Choose which warehouse branch to request products from
+              </p>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="product_name">Product Type</Label>
               <Select 
@@ -161,14 +196,14 @@ const InventoryRequestForm = () => {
                 </SelectTrigger>
                 <SelectContent>
                   {availableProducts.map((product) => (
-                    <SelectItem key={`${product.value}-${product.branch}`} value={product.value}>
-                      {product.label}
+                    <SelectItem key={product.value} value={product.value}>
+                      {product.label} ({product.available}kg available)
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <p className="text-xs text-slate-500">
-                Products shown from all branches - will auto-route to correct source
+                Products available from {formData.branch_id === "berhane" ? "Berhane" : "Girmay"} Branch
               </p>
             </div>
 

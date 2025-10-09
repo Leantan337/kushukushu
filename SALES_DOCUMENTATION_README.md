@@ -297,7 +297,7 @@ npm start
 ls frontend/src/components/sales/
 
 # Check backend endpoints
-curl http://localhost:8001/api/inventory
+curl http://localhost:8000/api/inventory
 ```
 
 ### 4. Plan Your Sprint

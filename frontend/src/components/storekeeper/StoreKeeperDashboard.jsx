@@ -28,7 +28,7 @@ const StoreKeeperDashboard = () => {
 
   const fetchDashboardStats = async () => {
     try {
-      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
       
       // Fetch inventory stats - filter by branch
       const inventoryResponse = await fetch(`${backendUrl}/api/inventory?branch_id=${userBranch}`);
@@ -57,7 +57,7 @@ const StoreKeeperDashboard = () => {
 
   const fetchRecentActivities = async () => {
     try {
-      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
       
       // Fetch recent audit logs - filter by branch
       const auditResponse = await fetch(`${backendUrl}/api/audit-logs?branch_id=${userBranch}&limit=10`);

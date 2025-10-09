@@ -25,12 +25,15 @@ const ManagerQueue = ({ manager, onSuccess }) => {
 
   const fetchPendingOrders = async () => {
     try {
-      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
-      const response = await fetch(`${backendUrl}/inventory-requests/manager-queue`);
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
+      // Filter by branch
+      const response = await fetch(`${backendUrl}/api/inventory-requests/manager-queue?branch_id=${manager.branch_id}`);
       
       if (response.ok) {
         const data = await response.json();
-        setPendingOrders(data);
+        // Ensure we only show orders for this manager's branch
+        const branchOrders = data.filter(order => order.branch_id === manager.branch_id || order.source_branch === manager.branch_id);
+        setPendingOrders(branchOrders);
       } else {
         console.error('Failed to fetch pending orders');
         // Mock data for demo
@@ -69,7 +72,7 @@ const ManagerQueue = ({ manager, onSuccess }) => {
     setMessage({ type: '', text: '' });
 
     try {
-      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
       const response = await fetch(`${backendUrl}/inventory-requests/${orderId}/approve`, {
         method: 'POST',
         headers: {

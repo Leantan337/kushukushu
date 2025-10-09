@@ -153,6 +153,26 @@ class InventoryItem(BaseModel):
     transactions: List[Transaction] = []
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    
+    # Branch-specific fields
+    category: Optional[str] = None  # flour, bran, service
+    branch_id: Optional[str] = None
+    branch_name: Optional[str] = None
+    
+    # Product fields for sales
+    product_type: Optional[str] = None
+    package_size: Optional[str] = None
+    packages_available: Optional[int] = None
+    unit_price: Optional[float] = None
+    is_sellable: Optional[bool] = True
+    is_service: Optional[bool] = False
+    service_for: Optional[str] = None
+    notes: Optional[str] = None
+    current_stock: Optional[float] = None  # Alias for quantity for compatibility
+    
+    # TDF-specific fields (Berhane branch only)
+    is_tdf: Optional[bool] = False  # True if product is made from TDF wheat
+    tdf_source: Optional[str] = None  # "Tigray Defense Force" for TDF products
 
 class InventoryItemCreate(BaseModel):
     name: str
@@ -1251,8 +1271,11 @@ async def create_wheat_delivery(delivery: RawWheatDeliveryCreate):
     
     await db.raw_wheat_deliveries.insert_one(doc)
     
-    # Find Raw Wheat inventory item and update stock
-    raw_wheat_item = await db.inventory.find_one({"name": "Raw Wheat"}, {"_id": 0})
+    # Find Raw Wheat inventory item for this branch and update stock
+    raw_wheat_item = await db.inventory.find_one(
+        {"name": "Raw Wheat", "branch_id": delivery.branch_id}, 
+        {"_id": 0}
+    )
     if raw_wheat_item:
         # Add inventory transaction
         await add_inventory_transaction(
@@ -1261,6 +1284,11 @@ async def create_wheat_delivery(delivery: RawWheatDeliveryCreate):
             delivery.quantity_kg,
             f"Wheat Delivery from {delivery.supplier_name}",
             delivery.manager_id
+        )
+    else:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Raw Wheat inventory not found for branch {delivery.branch_id}"
         )
     
     # Create audit log
@@ -1281,12 +1309,13 @@ async def create_wheat_delivery(delivery: RawWheatDeliveryCreate):
     return wheat_delivery
 
 @api_router.get("/inventory-requests/manager-queue", response_model=List[InternalOrderRequisition])
-async def get_manager_queue():
-    """Fetches all stock requests pending manager approval - NEW WORKFLOW"""
-    orders = await db.stock_requests.find(
-        {"status": InternalOrderStatus.PENDING_MANAGER_APPROVAL}, 
-        {"_id": 0}
-    ).to_list(1000)
+async def get_manager_queue(branch_id: Optional[str] = None):
+    """Fetches all stock requests pending manager approval - NEW WORKFLOW, optionally filtered by branch"""
+    query = {"status": InternalOrderStatus.PENDING_MANAGER_APPROVAL}
+    if branch_id:
+        query["source_branch"] = branch_id
+    
+    orders = await db.stock_requests.find(query, {"_id": 0}).to_list(1000)
     
     for order in orders:
         deserialize_datetime(order)
@@ -1299,16 +1328,22 @@ async def approve_inventory_request(order_id: str, approval: ManagerApprovalActi
 
 @api_router.post("/milling-orders", response_model=MillingOrder)
 async def create_milling_order(order: MillingOrderCreate):
-    """Creates a new milling order and deducts raw wheat from inventory"""
-    # Check if there's enough raw wheat in inventory
-    raw_wheat_item = await db.inventory.find_one({"name": "Raw Wheat"}, {"_id": 0})
+    """Creates a new milling order and deducts raw wheat from inventory for specific branch"""
+    # Check if there's enough raw wheat in inventory for this branch
+    raw_wheat_item = await db.inventory.find_one(
+        {"name": "Raw Wheat", "branch_id": order.branch_id}, 
+        {"_id": 0}
+    )
     if not raw_wheat_item:
-        raise HTTPException(status_code=404, detail="Raw Wheat inventory item not found")
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Raw Wheat inventory item not found for branch {order.branch_id}"
+        )
     
     if raw_wheat_item["quantity"] < order.raw_wheat_input_kg:
         raise HTTPException(
             status_code=400, 
-            detail=f"Insufficient raw wheat. Available: {raw_wheat_item['quantity']}kg, Required: {order.raw_wheat_input_kg}kg"
+            detail=f"Insufficient raw wheat in {order.branch_id} branch. Available: {raw_wheat_item['quantity']}kg, Required: {order.raw_wheat_input_kg}kg"
         )
     
     # Create the milling order
@@ -1343,6 +1378,20 @@ async def create_milling_order(order: MillingOrderCreate):
     
     return milling_order
 
+@api_router.get("/milling-orders", response_model=List[MillingOrder])
+async def get_milling_orders(branch_id: Optional[str] = None, status: Optional[MillingOrderStatus] = None):
+    """Get milling orders, optionally filtered by branch and status"""
+    query = {}
+    if branch_id:
+        query["branch_id"] = branch_id
+    if status:
+        query["status"] = status
+    
+    orders = await db.milling_orders.find(query, {"_id": 0}).sort("timestamp", -1).to_list(1000)
+    for order in orders:
+        deserialize_datetime(order)
+    return orders
+
 @api_router.post("/milling-orders/{order_id}/complete")
 async def complete_milling_order(order_id: str, completion: MillingOrderCompletion):
     """Completes milling order and adds finished products to inventory"""
@@ -1356,11 +1405,18 @@ async def complete_milling_order(order_id: str, completion: MillingOrderCompleti
     
     # Process each output product
     output_records = []
+    branch_id = milling_order.get("branch_id")
     for output in completion.outputs:
-        # Find the product in inventory
-        product_item = await db.inventory.find_one({"id": output.product_id}, {"_id": 0})
+        # Find the product in inventory for this branch
+        product_item = await db.inventory.find_one(
+            {"id": output.product_id, "branch_id": branch_id}, 
+            {"_id": 0}
+        )
         if not product_item:
-            raise HTTPException(status_code=404, detail=f"Product with ID {output.product_id} not found")
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Product with ID {output.product_id} not found for branch {branch_id}"
+            )
         
         # Add to inventory
         await add_inventory_transaction(
@@ -1424,6 +1480,18 @@ async def get_audit_logs(entity_type: Optional[str] = None, user: Optional[str] 
 
 
 # ==================== SALES ROLE ENDPOINTS ====================
+
+@api_router.get("/sales-transactions")
+async def get_sales_transactions(branch_id: Optional[str] = None):
+    """
+    Get all sales transactions, optionally filtered by branch.
+    """
+    query = {}
+    if branch_id:
+        query["branch_id"] = branch_id
+    
+    transactions = await db.sales_transactions.find(query, {"_id": 0}).sort("timestamp", -1).to_list(1000)
+    return transactions
 
 @api_router.post("/sales-transactions", response_model=SalesTransaction)
 async def create_sales_transaction(transaction: SalesTransactionCreate):
@@ -2850,26 +2918,20 @@ def get_time_ago(timestamp):
 
 
 async def determine_source_branch(product_name: str):
-    """Determine which branch produces the product"""
-    # Product-to-branch mapping based on ACTUAL production
+    """Determine which branch produces the product based on actual production capabilities"""
+    # Product-to-branch mapping based on ACTUAL production capabilities
     product_branch_map = {
-        # Girmay Branch produces:
-        "1st Quality": "girmay",      # All 1st Quality flour
+        # ONLY Girmay Branch produces:
+        "1st Quality": "girmay",      # All 1st Quality flour - ONLY GIRMAY
+        "Fruskelo White": "girmay",   # White Fruskelo - ONLY GIRMAY
         
-        # Both branches produce Bread:
-        "Bread": "both",               # Check both branches
+        # ONLY Berhane Branch produces:
+        "TDF": "berhane",             # TDF products (from Tigray Defense Force wheat) - ONLY BERHANE
+        "Fruskelo Red": "berhane",    # Red Fruskelo - ONLY BERHANE
         
-        # Both branches produce Fruska:
-        "Fruska": "both",              # Check both branches
-        
-        # Fruskelo Red - Both branches
-        "Fruskelo Red": "both",
-        
-        # Fruskelo White - Only Girmay
-        "Fruskelo White": "girmay",
-        
-        # TDF Service - Only Berhane
-        "TDF": "berhane"
+        # Both branches produce:
+        "Bread": "both",              # Bread flour - Check both branches
+        "Fruska": "both",             # Fruska - Check both branches
     }
     
     # Check which product type it matches

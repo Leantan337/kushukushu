@@ -378,7 +378,7 @@ Starting next, we'll implement:
 ### Issues?
 - Run linting: All clear! ✅
 - Check browser console for errors
-- Verify backend is running on port 8001
+- Verify backend is running on port 8000
 - Ensure MongoDB is accessible
 
 ---
@@ -426,7 +426,7 @@ cd backend && python add_new_products.py
 # Browser: http://localhost:3000 → Sales Dashboard
 
 # Test Finance Summary
-# Browser: http://localhost:8001/api/finance/summary
+# Browser: http://localhost:8000/api/finance/summary
 ```
 
 ---

@@ -159,7 +159,7 @@ All components are **backend-ready** with commented API code:
 
 ```javascript
 // Example from every component:
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 
 // API calls prepared:
 await fetch(`${BACKEND_URL}/api/finance/...`, {

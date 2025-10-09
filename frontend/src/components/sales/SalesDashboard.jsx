@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
+import { Badge } from "../ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { 
   ShoppingCart, 
@@ -33,6 +34,22 @@ const SalesDashboard = () => {
     pendingRequests: 0,
     lowStock: 0
   });
+
+  // Get current user info from localStorage
+  const getUserInfo = () => {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      return {
+        name: user.name || user.username
+      };
+    }
+    return {
+      name: "Sales User"
+    };
+  };
+
+  const currentUser = getUserInfo();
 
   const handleLogout = () => {
     // Clear any stored auth data
@@ -96,14 +113,84 @@ const SalesDashboard = () => {
   const [recentActivity, setRecentActivity] = useState([]);
   const [loadingActivity, setLoadingActivity] = useState(false);
 
-  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 
   useEffect(() => {
-    fetchRecentActivity();
+    fetchDashboardData();
     // Auto-refresh every 30 seconds
-    const interval = setInterval(fetchRecentActivity, 30000);
+    const interval = setInterval(fetchDashboardData, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // Refresh stats when returning to overview tab
+  useEffect(() => {
+    if (activeTab === "overview") {
+      fetchStats();
+    }
+  }, [activeTab]);
+
+  const fetchDashboardData = async () => {
+    await Promise.all([
+      fetchRecentActivity(),
+      fetchStats()
+    ]);
+  };
+
+  const fetchStats = async () => {
+    try {
+      // Fetch today's sales transactions
+      const salesResponse = await fetch(`${BACKEND_URL}/api/sales-transactions`);
+      let todaySales = 0;
+      let todayTransactions = 0;
+      
+      if (salesResponse.ok) {
+        const salesData = await salesResponse.json();
+        const today = new Date().toDateString();
+        
+        // Calculate today's sales
+        const todaysSales = salesData.filter(sale => {
+          const saleDate = new Date(sale.timestamp).toDateString();
+          return saleDate === today;
+        });
+        
+        todaySales = todaysSales.reduce((sum, sale) => sum + (sale.total_amount || 0), 0);
+        todayTransactions = todaysSales.length;
+      }
+
+      // Fetch pending stock requests
+      const requestsResponse = await fetch(`${BACKEND_URL}/api/stock-requests`);
+      let pendingRequests = 0;
+      
+      if (requestsResponse.ok) {
+        const requestsData = await requestsResponse.json();
+        pendingRequests = requestsData.filter(req => 
+          req.status === "pending_admin_approval" || 
+          req.status === "pending_manager_approval" ||
+          req.status === "admin_approved"
+        ).length;
+      }
+
+      // Fetch inventory for low stock count
+      const inventoryResponse = await fetch(`${BACKEND_URL}/api/inventory`);
+      let lowStock = 0;
+      
+      if (inventoryResponse.ok) {
+        const inventoryData = await inventoryResponse.json();
+        lowStock = inventoryData.filter(item => 
+          item.stock_level === "low" || item.stock_level === "critical"
+        ).length;
+      }
+
+      setStats({
+        todaySales,
+        todayTransactions,
+        pendingRequests,
+        lowStock
+      });
+    } catch (error) {
+      console.error("Error fetching stats:", error);
+    }
+  };
 
   const fetchRecentActivity = async () => {
     setLoadingActivity(true);
@@ -127,8 +214,13 @@ const SalesDashboard = () => {
         <div className="bg-white rounded-xl shadow-lg p-6 border border-slate-200">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-slate-900 mb-2">Sales Dashboard</h1>
-              <p className="text-slate-600">Flour Factory ERP - Sales Point</p>
+              <div className="flex items-center gap-3 mb-2">
+                <h1 className="text-3xl font-bold text-slate-900">Sales Dashboard</h1>
+                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 px-3 py-1">
+                  Sales Office
+                </Badge>
+              </div>
+              <p className="text-slate-600">Welcome, {currentUser.name} - Request products from any branch</p>
             </div>
             <Button
               onClick={handleLogout}

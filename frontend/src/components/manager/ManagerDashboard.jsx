@@ -32,12 +32,27 @@ const ManagerDashboard = () => {
   const [showDeliveryForm, setShowDeliveryForm] = useState(false);
   const [showMillingForm, setShowMillingForm] = useState(false);
 
-  // Mock user data - In real implementation, get from auth context
-  const currentManager = {
-    id: "manager-001",
-    name: "Yohannes Teklu",
-    branch_id: "branch-adigrat-001"
+  // Get current user from localStorage
+  const getUserInfo = () => {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      return {
+        id: `manager-${user.branch}`,
+        name: user.name || user.username,
+        branch_id: user.branch,
+        branch_name: user.branch === "berhane" ? "Berhane Branch" : "Girmay Branch"
+      };
+    }
+    return {
+      id: "manager-001",
+      name: "Manager",
+      branch_id: "berhane",
+      branch_name: "Berhane Branch"
+    };
   };
+
+  const currentManager = getUserInfo();
 
   useEffect(() => {
     fetchDashboardStats();
@@ -45,21 +60,21 @@ const ManagerDashboard = () => {
 
   const fetchDashboardStats = async () => {
     try {
-      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
       
-      // Fetch pending approvals
-      const approvalResponse = await fetch(`${backendUrl}/inventory-requests/manager-queue`);
+      // Fetch pending approvals for this branch
+      const approvalResponse = await fetch(`${backendUrl}/api/inventory-requests/manager-queue?branch_id=${currentManager.branch_id}`);
       const pendingApprovals = approvalResponse.ok ? await approvalResponse.json() : [];
       
-      // Fetch inventory to get raw wheat stock
-      const inventoryResponse = await fetch(`${backendUrl}/inventory`);
+      // Fetch inventory for this branch only
+      const inventoryResponse = await fetch(`${backendUrl}/api/inventory?branch_id=${currentManager.branch_id}`);
       const inventory = inventoryResponse.ok ? await inventoryResponse.json() : [];
-      const rawWheatItem = inventory.find(item => item.name === "Raw Wheat");
+      const rawWheatItem = inventory.find(item => item.name === "Raw Wheat" && item.branch_id === currentManager.branch_id);
       
       setStats({
         pendingApprovals: pendingApprovals.length,
         todayDeliveries: 3, // Mock data - would be calculated from today's deliveries
-        activeMilling: 1,   // Mock data - would be from active milling orders
+        activeMilling: 1,   // Mock data - would be from active milling orders for this branch
         rawWheatStock: rawWheatItem ? rawWheatItem.quantity : 0
       });
     } catch (error) {
@@ -115,7 +130,12 @@ const ManagerDashboard = () => {
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 mb-2">Manager Dashboard</h1>
+            <div className="flex items-center gap-3 mb-2">
+              <h1 className="text-3xl font-bold text-slate-900">Manager Dashboard</h1>
+              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 px-3 py-1">
+                {currentManager.branch_name}
+              </Badge>
+            </div>
             <p className="text-slate-600">Welcome back, {currentManager.name}</p>
           </div>
           <Button

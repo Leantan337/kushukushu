@@ -6,7 +6,7 @@ import { Label } from '../ui/label';
 import { Alert, AlertDescription } from '../ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Badge } from '../ui/badge';
-import { Factory, CheckCircle, AlertCircle, Package, Clock } from 'lucide-react';
+import { Factory, CheckCircle, AlertCircle, Package, Clock, Plus } from 'lucide-react';
 
 const MillingOrderForm = ({ manager, onSuccess, onCancel }) => {
   const [createFormData, setCreateFormData] = useState({
@@ -28,28 +28,26 @@ const MillingOrderForm = ({ manager, onSuccess, onCancel }) => {
 
   const fetchData = async () => {
     try {
-      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
       
-      // Fetch inventory to get available products and raw wheat stock
-      const inventoryResponse = await fetch(`${backendUrl}/inventory`);
+      // Fetch inventory for this branch only
+      const inventoryResponse = await fetch(`${backendUrl}/api/inventory?branch_id=${manager.branch_id}`);
       if (inventoryResponse.ok) {
         const inventoryData = await inventoryResponse.json();
-        setInventory(inventoryData);
+        // Filter to only show inventory for this branch
+        const branchInventory = inventoryData.filter(item => item.branch_id === manager.branch_id);
+        setInventory(branchInventory);
         
-        const rawWheat = inventoryData.find(item => item.name === "Raw Wheat");
+        const rawWheat = branchInventory.find(item => item.name === "Raw Wheat");
         setRawWheatStock(rawWheat ? rawWheat.quantity : 0);
       }
 
-      // Fetch milling orders (would need this endpoint for completion)
-      // For now, mock pending orders
-      setMillingOrders([
-        {
-          id: 'mill-001',
-          raw_wheat_input_kg: 3000,
-          status: 'pending',
-          timestamp: new Date().toISOString()
-        }
-      ]);
+      // Fetch milling orders for this branch
+      const millingOrdersResponse = await fetch(`${backendUrl}/api/milling-orders?branch_id=${manager.branch_id}&status=pending`);
+      if (millingOrdersResponse.ok) {
+        const millingOrdersData = await millingOrdersResponse.json();
+        setMillingOrders(millingOrdersData);
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
     }
@@ -61,7 +59,7 @@ const MillingOrderForm = ({ manager, onSuccess, onCancel }) => {
     setMessage({ type: '', text: '' });
 
     try {
-      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
       
       const orderData = {
         raw_wheat_input_kg: parseFloat(createFormData.raw_wheat_input_kg),
@@ -69,7 +67,7 @@ const MillingOrderForm = ({ manager, onSuccess, onCancel }) => {
         branch_id: manager.branch_id
       };
 
-      const response = await fetch(`${backendUrl}/milling-orders`, {
+      const response = await fetch(`${backendUrl}/api/milling-orders`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -119,9 +117,9 @@ const MillingOrderForm = ({ manager, onSuccess, onCancel }) => {
     setMessage({ type: '', text: '' });
 
     try {
-      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
       
-      const response = await fetch(`${backendUrl}/milling-orders/${orderId}/complete`, {
+      const response = await fetch(`${backendUrl}/api/milling-orders/${orderId}/complete`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -131,18 +129,19 @@ const MillingOrderForm = ({ manager, onSuccess, onCancel }) => {
 
       if (response.ok) {
         const result = await response.json();
+        const totalOutput = completionData.outputs.reduce((sum, o) => sum + (parseFloat(o.quantity) || 0), 0);
         setMessage({ 
           type: 'success', 
-          text: `Milling order completed successfully! ${completionData.outputs.length} products added to inventory.` 
+          text: `✅ Production logged successfully! ${completionData.outputs.length} product(s) totaling ${totalOutput.toFixed(2)}kg added to inventory.` 
         });
         
         // Reset completion data
         setCompletionData({ outputs: [] });
-        fetchData();
+        fetchData(); // Refresh data to show updated inventory
         
         setTimeout(() => {
           onSuccess && onSuccess();
-        }, 2000);
+        }, 2500);
       } else {
         const error = await response.json();
         setMessage({ 
@@ -238,73 +237,111 @@ const MillingOrderForm = ({ manager, onSuccess, onCancel }) => {
             {millingOrders.filter(order => order.status === 'pending').length > 0 ? (
               <div className="space-y-4">
                 {millingOrders.filter(order => order.status === 'pending').map((order) => (
-                  <div key={order.id} className="border rounded-lg p-4 space-y-4">
+                  <div key={order.id} className="border rounded-lg p-4 space-y-4 bg-white shadow-sm">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h4 className="font-medium">Milling Order {order.id}</h4>
-                        <p className="text-sm text-slate-600">{order.raw_wheat_input_kg}kg Raw Wheat</p>
+                        <h4 className="font-medium text-slate-900">Milling Order #{order.id.substring(0, 8).toUpperCase()}</h4>
+                        <p className="text-sm text-slate-600 mt-1">
+                          <span className="font-semibold">{order.raw_wheat_input_kg.toLocaleString()}kg</span> Raw Wheat Input
+                        </p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Created: {new Date(order.timestamp).toLocaleString()}
+                        </p>
                       </div>
-                      <Badge variant="outline">
+                      <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
                         <Clock className="w-3 h-3 mr-1" />
-                        Pending
+                        Pending Completion
                       </Badge>
                     </div>
 
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <Label>Output Products</Label>
+                    <div className="bg-slate-50 p-4 rounded-lg space-y-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <Label className="text-base font-semibold">Log Production Outputs</Label>
                         <Button 
                           type="button" 
                           variant="outline" 
                           size="sm"
                           onClick={addOutput}
+                          className="text-green-600 border-green-200 hover:bg-green-50"
                         >
+                          <Plus className="w-4 h-4 mr-1" />
                           Add Product
                         </Button>
                       </div>
+                      
+                      <p className="text-sm text-slate-600 mb-3">
+                        Record all finished products and by-products from this milling order
+                      </p>
+
+                      {completionData.outputs.length === 0 && (
+                        <div className="text-center py-4 text-slate-500 text-sm">
+                          Click "Add Product" to log your production outputs
+                        </div>
+                      )}
 
                       {completionData.outputs.map((output, index) => (
-                        <div key={index} className="flex gap-2">
-                          <select 
-                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                            value={output.product_id}
-                            onChange={(e) => updateOutput(index, 'product_id', e.target.value)}
-                            required
-                          >
-                            <option value="">Select product</option>
-                            {finishedProducts.map((product) => (
-                              <option key={product.id} value={product.id}>
-                                {product.name}
-                              </option>
-                            ))}
-                          </select>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="Quantity (kg)"
-                            value={output.quantity}
-                            onChange={(e) => updateOutput(index, 'quantity', e.target.value)}
-                            required
-                          />
-                          <Button 
-                            type="button" 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => removeOutput(index)}
-                          >
-                            Remove
-                          </Button>
+                        <div key={index} className="flex gap-2 items-start bg-white p-3 rounded-lg border">
+                          <div className="flex-1">
+                            <label className="text-xs text-slate-500 mb-1 block">Product</label>
+                            <select 
+                              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                              value={output.product_id}
+                              onChange={(e) => updateOutput(index, 'product_id', e.target.value)}
+                              required
+                            >
+                              <option value="">Select finished product</option>
+                              {finishedProducts.map((product) => (
+                                <option key={product.id} value={product.id}>
+                                  {product.name} (Available: {product.quantity.toLocaleString()}kg)
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="w-32">
+                            <label className="text-xs text-slate-500 mb-1 block">Output (kg)</label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="0.00"
+                              value={output.quantity}
+                              onChange={(e) => updateOutput(index, 'quantity', e.target.value)}
+                              required
+                              className="text-right"
+                            />
+                          </div>
+                          <div className="pt-6">
+                            <Button 
+                              type="button" 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => removeOutput(index)}
+                              className="text-red-600 border-red-200 hover:bg-red-50"
+                            >
+                              Remove
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </div>
 
+                    {completionData.outputs.length > 0 && (
+                      <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
+                        <p className="text-sm font-medium text-blue-900">
+                          Summary: {completionData.outputs.length} product{completionData.outputs.length !== 1 ? 's' : ''} to be logged
+                        </p>
+                        <p className="text-xs text-blue-700 mt-1">
+                          Total output: {completionData.outputs.reduce((sum, o) => sum + (parseFloat(o.quantity) || 0), 0).toFixed(2)}kg
+                        </p>
+                      </div>
+                    )}
+
                     <Button 
                       onClick={() => handleCompleteOrder(order.id)}
                       disabled={loading || completionData.outputs.length === 0}
-                      className="w-full"
+                      className="w-full bg-green-600 hover:bg-green-700"
                     >
-                      {loading ? 'Completing Order...' : 'Complete Milling Order'}
+                      {loading ? 'Logging Production...' : 'Complete Order & Log Outputs'}
                     </Button>
                   </div>
                 ))}

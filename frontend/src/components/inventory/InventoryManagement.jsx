@@ -36,7 +36,7 @@ const InventoryManagement = ({ userRole = "store_keeper", userBranch = null }) =
 
   const fetchInventory = async () => {
     try {
-      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
       // Add branch filter if userBranch is provided (for storekeepers)
       const branchParam = userBranch ? `?branch_id=${userBranch}` : '';
       const response = await fetch(`${backendUrl}/api/inventory${branchParam}`);
@@ -149,7 +149,7 @@ const InventoryManagement = ({ userRole = "store_keeper", userBranch = null }) =
 
     setLoading(true);
     try {
-      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
       const response = await fetch(`${backendUrl}/stock-adjustments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -254,54 +254,58 @@ const InventoryManagement = ({ userRole = "store_keeper", userBranch = null }) =
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Inventory List */}
-          <div className="space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Inventory Grid - Takes 2 columns */}
+          <div className="lg:col-span-2 space-y-4">
             <h2 className="text-xl font-semibold text-slate-900">Inventory Items</h2>
-            {filteredItems.map((item) => (
-              <Card
-                key={item.id}
-                className={`cursor-pointer transition-all hover:shadow-md ${
-                  selectedItem?.id === item.id ? 'ring-2 ring-blue-500 shadow-md' : ''
-                }`}
-                onClick={() => handleItemClick(item)}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-blue-100 rounded-lg">
-                        <Package className="w-6 h-6 text-blue-600" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-slate-900">{item.name}</h3>
-                        <p className="text-sm text-slate-500">Current Stock</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {filteredItems.map((item) => (
+                <Card
+                  key={item.id}
+                  className={`cursor-pointer transition-all hover:shadow-md ${
+                    selectedItem?.id === item.id ? 'ring-2 ring-blue-500 shadow-md' : ''
+                  }`}
+                  onClick={() => handleItemClick(item)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="p-2 bg-blue-100 rounded-lg">
+                          <Package className="w-5 h-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-slate-900 text-sm">{item.name}</h3>
+                          <p className="text-xs text-slate-500">Current Stock</p>
+                        </div>
                       </div>
                     </div>
-                    <Badge className={`${getStockLevelColor(item.stock_level)} flex items-center gap-1`}>
+                    <Badge className={`${getStockLevelColor(item.stock_level)} flex items-center gap-1 w-full justify-center mb-2`}>
                       {getStockLevelIcon(item.stock_level)}
                       {item.stock_level.toUpperCase()}
                     </Badge>
-                  </div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-bold text-slate-900">
-                      {item.quantity.toLocaleString()}
-                    </span>
-                    <span className="text-lg text-slate-500">{item.unit}</span>
-                  </div>
-                  <div className="mt-3 pt-3 border-t border-slate-200 flex justify-between text-sm">
-                    <span className="text-slate-600">
-                      Low: <span className="font-medium">{item.low_threshold.toLocaleString()}{item.unit}</span>
-                    </span>
-                    <span className="text-slate-600">
-                      Critical: <span className="font-medium text-red-600">{item.critical_threshold.toLocaleString()}{item.unit}</span>
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    <div className="flex items-baseline gap-2 mb-3">
+                      <span className="text-2xl font-bold text-slate-900">
+                        {item.quantity.toLocaleString()}
+                      </span>
+                      <span className="text-base text-slate-500">{item.unit}</span>
+                    </div>
+                    <div className="pt-3 border-t border-slate-200 space-y-1 text-xs">
+                      <div className="flex justify-between text-slate-600">
+                        <span>Low:</span>
+                        <span className="font-medium">{item.low_threshold.toLocaleString()}{item.unit}</span>
+                      </div>
+                      <div className="flex justify-between text-slate-600">
+                        <span>Critical:</span>
+                        <span className="font-medium text-red-600">{item.critical_threshold.toLocaleString()}{item.unit}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
 
-          {/* Item Detail View */}
+          {/* Item Detail View - Takes 1 column */}
           <div className="space-y-4">
             {selectedItem ? (
               <>

@@ -73,7 +73,7 @@ python update_branch_products.py
 ```bash
 python server.py
 ```
-**Running on:** http://localhost:8001
+**Running on:** http://localhost:8000
 
 ### Step 3: Start Frontend
 ```bash
@@ -89,10 +89,10 @@ npm start
 ### Backend Health Check
 ```bash
 # Test API is running
-curl http://localhost:8001/api/
+curl http://localhost:8000/api/
 
 # Check inventory
-curl http://localhost:8001/api/inventory
+curl http://localhost:8000/api/inventory
 
 # Should see 14 products with branch_id
 ```

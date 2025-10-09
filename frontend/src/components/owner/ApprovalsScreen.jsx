@@ -3,9 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
-import { ArrowLeft, CheckCircle, XCircle, Clock, User, Calendar, DollarSign } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+import { ArrowLeft, CheckCircle, XCircle, Clock, User, Calendar, DollarSign, Package } from "lucide-react";
 import { useToast } from "../../hooks/use-toast";
 import { mockData } from "../../data/mockData";
+import StockRequestApprovals from "./StockRequestApprovals";
 
 const ApprovalsScreen = () => {
   const navigate = useNavigate();
@@ -146,47 +148,69 @@ const ApprovalsScreen = () => {
         </div>
       </div>
 
-      <div className="p-4 space-y-4">
-        {/* Filter Tabs */}
-        <div className="flex space-x-2 overflow-x-auto pb-2">
-          {["All", "High", "Medium", "Low"].map((filterOption) => (
-            <Button
-              key={filterOption}
-              variant={filter === filterOption ? "default" : "outline"}
-              size="sm"
-              onClick={() => setFilter(filterOption)}
-              className={`whitespace-nowrap ${
-                filter === filterOption
-                  ? "bg-slate-900 text-white"
-                  : "border-slate-200 text-slate-700 hover:bg-slate-50"
-              }`}
-            >
-              {filterOption}
-              {filterOption !== "All" && (
-                <Badge className="ml-2 bg-white text-slate-900 text-xs">
-                  {approvals.filter(a => a.priority === filterOption).length}
-                </Badge>
-              )}
-            </Button>
-          ))}
-        </div>
+      <div className="p-4">
+        {/* Tabs for different approval types */}
+        <Tabs defaultValue="stock-requests" className="space-y-4">
+          <TabsList className="bg-white border border-slate-200">
+            <TabsTrigger value="stock-requests" className="flex items-center gap-2">
+              <Package className="w-4 h-4" />
+              Stock Requests (Real Data)
+            </TabsTrigger>
+            <TabsTrigger value="other" className="flex items-center gap-2">
+              <DollarSign className="w-4 h-4" />
+              Other Approvals
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Approvals List */}
-        {filteredApprovals.length === 0 ? (
-          <Card className="bg-white shadow-sm border-slate-200">
-            <CardContent className="p-8 text-center">
-              <CheckCircle className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-slate-900 mb-2">All Caught Up!</h3>
-              <p className="text-slate-600">No pending approvals at the moment.</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            {filteredApprovals.map((approval) => (
-              <ApprovalCard key={approval.id} approval={approval} />
-            ))}
-          </div>
-        )}
+          {/* Stock Request Approvals - REAL DATA */}
+          <TabsContent value="stock-requests">
+            <StockRequestApprovals />
+          </TabsContent>
+
+          {/* Other Approvals - Mock Data */}
+          <TabsContent value="other" className="space-y-4">
+            {/* Filter Tabs */}
+            <div className="flex space-x-2 overflow-x-auto pb-2">
+              {["All", "High", "Medium", "Low"].map((filterOption) => (
+                <Button
+                  key={filterOption}
+                  variant={filter === filterOption ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setFilter(filterOption)}
+                  className={`whitespace-nowrap ${
+                    filter === filterOption
+                      ? "bg-slate-900 text-white"
+                      : "border-slate-200 text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  {filterOption}
+                  {filterOption !== "All" && (
+                    <Badge className="ml-2 bg-white text-slate-900 text-xs">
+                      {approvals.filter(a => a.priority === filterOption).length}
+                    </Badge>
+                  )}
+                </Button>
+              ))}
+            </div>
+
+            {/* Approvals List */}
+            {filteredApprovals.length === 0 ? (
+              <Card className="bg-white shadow-sm border-slate-200">
+                <CardContent className="p-8 text-center">
+                  <CheckCircle className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-slate-900 mb-2">All Caught Up!</h3>
+                  <p className="text-slate-600">No pending approvals at the moment.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {filteredApprovals.map((approval) => (
+                  <ApprovalCard key={approval.id} approval={approval} />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

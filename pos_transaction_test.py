@@ -29,7 +29,7 @@ def load_env_file(file_path):
 
 # Get backend URL from frontend .env file
 frontend_env = load_env_file('/app/frontend/.env')
-BACKEND_URL = frontend_env.get('REACT_APP_BACKEND_URL', 'http://localhost:8001')
+BACKEND_URL = frontend_env.get('REACT_APP_BACKEND_URL', 'http://localhost:8000')
 API_BASE_URL = f"{BACKEND_URL}/api"
 
 print(f"Testing POS Transaction API at: {API_BASE_URL}")

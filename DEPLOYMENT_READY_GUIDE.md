@@ -34,7 +34,7 @@ python update_branch_products.py
 ```bash
 python server.py
 ```
-**Result:** API running on `http://localhost:8001`
+**Result:** API running on `http://localhost:8000`
 
 ---
 
