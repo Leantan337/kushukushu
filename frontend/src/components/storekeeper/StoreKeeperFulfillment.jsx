@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -15,19 +15,35 @@ const StoreKeeperFulfillment = () => {
   const [packingSlip, setPackingSlip] = useState("");
   const [actualQuantity, setActualQuantity] = useState("");
   const [notes, setNotes] = useState("");
+  const [gatePassNumber, setGatePassNumber] = useState("");
+  const [vehicleNumber, setVehicleNumber] = useState("");
+  const [driverName, setDriverName] = useState("");
   const [loading, setLoading] = useState(false);
 
   const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
+  
+  // Get current user info
+  const getUserInfo = () => {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      return {
+        name: user.name || user.username,
+        branch_id: user.branch
+      };
+    }
+    return {
+      name: "Storekeeper",
+      branch_id: "main_warehouse"
+    };
+  };
+  
+  const currentUser = getUserInfo();
 
-  useEffect(() => {
-    fetchPendingRequests();
-    const interval = setInterval(fetchPendingRequests, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const fetchPendingRequests = async () => {
+  const fetchPendingRequests = useCallback(async () => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/stock-requests?status=pending_fulfillment`);
+      // Filter by source branch - only show requests from this storekeeper's warehouse
+      const response = await fetch(`${BACKEND_URL}/api/stock-requests?status=pending_fulfillment&source_branch=${currentUser.branch_id}`);
       if (response.ok) {
         const data = await response.json();
         setRequests(data);
@@ -35,7 +51,13 @@ const StoreKeeperFulfillment = () => {
     } catch (error) {
       console.error("Error fetching requests:", error);
     }
-  };
+  }, [BACKEND_URL, currentUser.branch_id]);
+
+  useEffect(() => {
+    fetchPendingRequests();
+    const interval = setInterval(fetchPendingRequests, 30000);
+    return () => clearInterval(interval);
+  }, [fetchPendingRequests]);
 
   const handleFulfill = async (requestId) => {
     if (!actualQuantity) {
@@ -47,28 +69,43 @@ const StoreKeeperFulfillment = () => {
       return;
     }
 
+    if (!vehicleNumber || !driverName) {
+      toast({
+        title: "Error",
+        description: "Please enter vehicle number and driver name for gate pass",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const response = await fetch(`${BACKEND_URL}/api/stock-requests/${requestId}/fulfill`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          fulfilled_by: "Storekeeper User", // Replace with actual user
+          fulfilled_by: currentUser.name,
           packing_slip_number: packingSlip || undefined,
           actual_quantity: parseInt(actualQuantity),
-          notes: notes || undefined
+          notes: notes || undefined,
+          gate_pass_number: gatePassNumber || undefined,
+          vehicle_number: vehicleNumber,
+          driver_name: driverName
         })
       });
 
       if (response.ok) {
         toast({
           title: "Fulfilled",
-          description: "Stock request fulfilled and ready for pickup",
+          description: "Stock request fulfilled with gate pass. Awaiting manager approval for release.",
         });
         setSelectedRequest(null);
         setPackingSlip("");
         setActualQuantity("");
         setNotes("");
+        setGatePassNumber("");
+        setVehicleNumber("");
+        setDriverName("");
         fetchPendingRequests();
       } else {
         const error = await response.json();
@@ -210,6 +247,49 @@ const StoreKeeperFulfillment = () => {
                         </div>
                       </div>
 
+                      <div className="p-3 bg-yellow-50 border border-yellow-300 rounded">
+                        <p className="text-sm font-semibold text-yellow-900 mb-2">
+                          🚧 Gate Pass Information (Required)
+                        </p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label htmlFor="gate_pass" className="text-xs">Gate Pass Number (Optional)</Label>
+                            <Input
+                              id="gate_pass"
+                              value={gatePassNumber}
+                              onChange={(e) => setGatePassNumber(e.target.value)}
+                              placeholder={`GP-${request.request_number}`}
+                              className="mt-1 h-9"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="vehicle" className="text-xs">Vehicle Number *</Label>
+                            <Input
+                              id="vehicle"
+                              value={vehicleNumber}
+                              onChange={(e) => setVehicleNumber(e.target.value)}
+                              placeholder="ET-123-ABC"
+                              className="mt-1 h-9"
+                              required
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <Label htmlFor="driver" className="text-xs">Driver Name *</Label>
+                            <Input
+                              id="driver"
+                              value={driverName}
+                              onChange={(e) => setDriverName(e.target.value)}
+                              placeholder="Driver full name"
+                              className="mt-1 h-9"
+                              required
+                            />
+                          </div>
+                        </div>
+                        <p className="text-xs text-yellow-800 mt-2">
+                          Gate pass will be printed for guard verification
+                        </p>
+                      </div>
+
                       <div>
                         <Label htmlFor="notes">Fulfillment Notes (Optional)</Label>
                         <Textarea
@@ -242,6 +322,9 @@ const StoreKeeperFulfillment = () => {
                             setPackingSlip("");
                             setActualQuantity("");
                             setNotes("");
+                            setGatePassNumber("");
+                            setVehicleNumber("");
+                            setDriverName("");
                           }}
                           variant="outline"
                           className="flex-1"
@@ -277,9 +360,10 @@ const StoreKeeperFulfillment = () => {
                 <li>Pull items from warehouse inventory</li>
                 <li>Verify quality and count accuracy</li>
                 <li>Package securely for transport</li>
-                <li>Generate/attach packing slip</li>
-                <li>Mark as fulfilled (inventory auto-deducted)</li>
-                <li>Items move to gate for guard verification</li>
+                <li>Generate packing slip and gate pass</li>
+                <li>Enter vehicle and driver information</li>
+                <li>Submit for manager approval</li>
+                <li>Print gate pass for guard (manual check)</li>
               </ol>
             </div>
           </div>

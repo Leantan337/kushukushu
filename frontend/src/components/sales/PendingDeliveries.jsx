@@ -28,14 +28,40 @@ const PendingDeliveries = () => {
 
   const fetchPendingDeliveries = async () => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/stock-requests?status=in_transit`);
-      if (response.ok) {
-        const data = await response.json();
-        setDeliveries(data);
-      }
+      // Fetch both ready_for_pickup and in_transit items
+      const [readyResponse, transitResponse] = await Promise.all([
+        fetch(`${BACKEND_URL}/api/stock-requests?status=ready_for_pickup`),
+        fetch(`${BACKEND_URL}/api/stock-requests?status=in_transit`)
+      ]);
+      
+      const readyData = readyResponse.ok ? await readyResponse.json() : [];
+      const transitData = transitResponse.ok ? await transitResponse.json() : [];
+      
+      // Combine and sort by requested_at
+      const combined = [...readyData, ...transitData].sort((a, b) => 
+        new Date(b.requested_at) - new Date(a.requested_at)
+      );
+      
+      setDeliveries(combined);
     } catch (error) {
       console.error("Error fetching deliveries:", error);
     }
+  };
+
+  // Get current user info
+  const getUserInfo = () => {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      return {
+        name: user.name || user.username,
+        branch_id: user.branch
+      };
+    }
+    return {
+      name: "Sales User",
+      branch_id: "unknown"
+    };
   };
 
   const handleConfirm = async (deliveryId) => {
@@ -48,13 +74,14 @@ const PendingDeliveries = () => {
       return;
     }
 
+    const currentUser = getUserInfo();
     setLoading(true);
     try {
       const response = await fetch(`${BACKEND_URL}/api/stock-requests/${deliveryId}/confirm-delivery`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          confirmed_by: "Sales User", // Replace with actual user
+          confirmed_by: currentUser.name,
           received_quantity: parseInt(receivedQuantity),
           condition: condition,
           notes: notes || undefined
@@ -101,6 +128,12 @@ const PendingDeliveries = () => {
           <CardDescription>Confirm receipt of stock deliveries</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+            <p className="text-sm text-blue-900">
+              <strong>ℹ️ Note:</strong> You can confirm delivery once items are fulfilled. 
+              Items will show "Ready for Pickup" until gate verification, or "In Transit" after gate clearance.
+            </p>
+          </div>
           {deliveries.length === 0 ? (
             <div className="text-center py-12">
               <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
@@ -120,10 +153,17 @@ const PendingDeliveries = () => {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-bold text-slate-900">{delivery.request_number}</h3>
-                        <Badge variant="outline" className="text-green-600 border-green-300">
-                          <Truck className="w-3 h-3 mr-1" />
-                          In Transit
-                        </Badge>
+                        {delivery.status === 'in_transit' ? (
+                          <Badge variant="outline" className="text-green-600 border-green-300">
+                            <Truck className="w-3 h-3 mr-1" />
+                            In Transit
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-orange-600 border-orange-300">
+                            <Package className="w-3 h-3 mr-1" />
+                            Ready for Pickup
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-sm text-slate-600">
                         Your request from: <span className="font-medium">{new Date(delivery.requested_at).toLocaleDateString()}</span>
@@ -181,9 +221,16 @@ const PendingDeliveries = () => {
                     <Badge variant="outline" className="text-orange-600 border-orange-300 text-xs">
                       ✓ Fulfilled
                     </Badge>
-                    <Badge variant="outline" className="text-blue-600 border-blue-300 text-xs">
-                      ✓ Gate Verified
-                    </Badge>
+                    {delivery.status === 'in_transit' && (
+                      <Badge variant="outline" className="text-blue-600 border-blue-300 text-xs">
+                        ✓ Gate Verified
+                      </Badge>
+                    )}
+                    {delivery.status === 'ready_for_pickup' && (
+                      <Badge variant="outline" className="text-yellow-600 border-yellow-300 text-xs">
+                        ⏳ Pending Gate Verification
+                      </Badge>
+                    )}
                   </div>
 
                   {selectedDelivery?.id === delivery.id && (

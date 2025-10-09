@@ -20,6 +20,7 @@ import {
 import WheatDeliveryForm from "./WheatDeliveryForm";
 import MillingOrderForm from "./MillingOrderForm";
 import ManagerQueue from "./ManagerQueue";
+import ManagerGatePassApprovals from "./ManagerGatePassApprovals";
 
 const ManagerDashboard = () => {
   const navigate = useNavigate();
@@ -187,7 +188,8 @@ const ManagerDashboard = () => {
             <TabsTrigger value="overview" className="px-6 py-2">Overview</TabsTrigger>
             <TabsTrigger value="deliveries" className="px-6 py-2">Wheat Deliveries</TabsTrigger>
             <TabsTrigger value="milling" className="px-6 py-2">Milling Orders</TabsTrigger>
-            <TabsTrigger value="approvals" className="px-6 py-2">Approvals Queue</TabsTrigger>
+            <TabsTrigger value="approvals" className="px-6 py-2">Stock Approvals</TabsTrigger>
+            <TabsTrigger value="gatepass" className="px-6 py-2">Gate Pass Approvals</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
@@ -281,6 +283,10 @@ const ManagerDashboard = () => {
 
           <TabsContent value="approvals">
             <ManagerQueue manager={currentManager} onSuccess={() => fetchDashboardStats()} />
+          </TabsContent>
+
+          <TabsContent value="gatepass">
+            <ManagerGatePassApprovals />
           </TabsContent>
         </Tabs>
 

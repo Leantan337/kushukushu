@@ -73,13 +73,14 @@ const ManagerQueue = ({ manager, onSuccess }) => {
 
     try {
       const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
-      const response = await fetch(`${backendUrl}/inventory-requests/${orderId}/approve`, {
+      const response = await fetch(`${backendUrl}/api/inventory-requests/${orderId}/approve`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          approved_by: manager.id
+          approved_by: manager.name || manager.id,
+          notes: 'Approved by manager'
         })
       });
 

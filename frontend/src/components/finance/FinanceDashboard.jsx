@@ -48,125 +48,121 @@ const FinanceDashboard = () => {
     loadDashboardData();
   }, []);
 
-  const loadDashboardData = () => {
+  const loadDashboardData = async () => {
     setLoading(true);
+    const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
     
-    // Simulate API call - replace with actual backend calls
-    setTimeout(() => {
+    try {
+      // Parallel fetch all data
+      const [
+        financeSum,
+        pendingAuth,
+        recentTxns,
+        pendingRecon,
+        loansData
+      ] = await Promise.all([
+        fetch(`${BACKEND_URL}/api/finance/summary`).then(r => r.ok ? r.json() : {}),
+        fetch(`${BACKEND_URL}/api/finance/pending-authorizations`).then(r => r.ok ? r.json() : []),
+        fetch(`${BACKEND_URL}/api/finance/transactions?limit=10`).then(r => r.ok ? r.json() : []),
+        fetch(`${BACKEND_URL}/api/finance/reconciliation/pending`).then(r => r.ok ? r.json() : []),
+        fetch(`${BACKEND_URL}/api/loans?status=active&limit=100`).then(r => r.ok ? r.json() : [])
+      ]);
+
+      // Calculate KPIs
+      const totalReceivable = loansData.reduce((sum, loan) => sum + (loan.balance || 0), 0);
+      const pendingPaymentsTotal = pendingAuth.reduce((sum, pr) => sum + (pr.estimated_cost || 0), 0);
+
+      // Format pending approvals
+      const formattedApprovals = pendingAuth.slice(0, 5).map((pr, index) => ({
+        id: pr.id || index,
+        type: 'Payment',
+        title: pr.description || 'Purchase Request',
+        amount: pr.estimated_cost || 0,
+        requestedBy: pr.requested_by || 'Unknown',
+        date: new Date(pr.requested_at || Date.now()).toLocaleDateString(),
+        priority: pr.estimated_cost > 1000000 ? 'High' : pr.estimated_cost > 100000 ? 'Medium' : 'Low',
+        status: pr.status || 'owner_approved'
+      }));
+
+      // Format recent transactions
+      const formattedTransactions = recentTxns.map((txn) => ({
+        id: txn.id,
+        type: txn.type,
+        description: txn.description || 'Transaction',
+        amount: txn.amount || 0,
+        date: new Date(txn.transaction_date || txn.created_at).toLocaleString(),
+        branch: txn.branch_id || 'Unknown',
+        status: txn.reconciliation_status === 'reconciled' ? 'completed' : 'pending'
+      }));
+
+      // Generate alerts
+      const alerts = [];
+      if (pendingPaymentsTotal > 0) {
+        alerts.push({
+          id: 1,
+          type: 'warning',
+          title: 'Pending Payments',
+          message: `${pendingAuth.length} payment(s) totaling Br ${pendingPaymentsTotal.toLocaleString()} require processing`,
+          priority: 'high'
+        });
+      }
+      if (pendingRecon.length > 0) {
+        alerts.push({
+          id: 2,
+          type: 'info',
+          title: 'Daily Reconciliation Needed',
+          message: `${pendingRecon.length} reconciliation(s) awaiting verification`,
+          priority: 'medium'
+        });
+      }
+      if (financeSum.net_balance > 0) {
+        alerts.push({
+          id: 3,
+          type: 'success',
+          title: 'Positive Cash Flow',
+          message: 'Net cash flow is positive',
+          priority: 'low'
+        });
+      }
+
       setDashboardData({
         kpis: {
-          cashBalance: 45230000,
-          pendingPayments: 8500000,
-          accountsReceivable: 3240000,
-          todaysSales: 2350000,
-          cashFlow: 1180000, // Positive cash flow
-          monthlyRevenue: 58000000
+          cashBalance: financeSum.cash_account || 0,
+          pendingPayments: pendingPaymentsTotal,
+          accountsReceivable: totalReceivable,
+          todaysSales: 0, // Will be calculated from today's transactions
+          cashFlow: financeSum.net_balance || 0,
+          monthlyRevenue: financeSum.total_income || 0
         },
-        pendingApprovals: [
-          {
-            id: 1,
-            type: 'Payment',
-            title: 'Supplier Payment - Premium Wheat',
-            amount: 8500000,
-            requestedBy: 'Manager - Berhane',
-            date: '2025-01-15',
-            priority: 'High',
-            status: 'owner_approved'
-          },
-          {
-            id: 2,
-            type: 'Payment',
-            title: 'Equipment Maintenance',
-            amount: 3800000,
-            requestedBy: 'Admin Team',
-            date: '2025-01-14',
-            priority: 'Medium',
-            status: 'admin_approved'
-          },
-          {
-            id: 3,
-            type: 'Expense',
-            title: 'Transportation Costs',
-            amount: 450000,
-            requestedBy: 'Manager - Girmay',
-            date: '2025-01-15',
-            priority: 'Low',
-            status: 'manager_approved'
-          }
-        ],
-        recentTransactions: [
-          {
-            id: 1,
-            type: 'income',
-            description: 'Sales Revenue - Berhane Branch',
-            amount: 1240000,
-            date: '2025-01-15 16:30',
-            branch: 'Berhane',
-            status: 'completed'
-          },
-          {
-            id: 2,
-            type: 'income',
-            description: 'Sales Revenue - Girmay Branch',
-            amount: 1110000,
-            date: '2025-01-15 16:25',
-            branch: 'Girmay',
-            status: 'completed'
-          },
-          {
-            id: 3,
-            type: 'expense',
-            description: 'Utility Bills - Both Branches',
-            amount: 125000,
-            date: '2025-01-15 14:00',
-            branch: 'Both',
-            status: 'completed'
-          },
-          {
-            id: 4,
-            type: 'expense',
-            description: 'Staff Salaries - January',
-            amount: 850000,
-            date: '2025-01-15 10:00',
-            branch: 'Both',
-            status: 'completed'
-          },
-          {
-            id: 5,
-            type: 'receivable',
-            description: 'Loan Payment Due - Habesha Bakery',
-            amount: 850000,
-            date: '2025-01-15 08:00',
-            branch: 'Berhane',
-            status: 'pending'
-          }
-        ],
-        alerts: [
-          {
-            id: 1,
-            type: 'warning',
-            title: 'Large Payment Pending',
-            message: 'Supplier payment of Br 8.5M requires processing',
-            priority: 'high'
-          },
-          {
-            id: 2,
-            type: 'info',
-            title: 'Daily Reconciliation Needed',
-            message: 'Today\'s sales not yet reconciled',
-            priority: 'medium'
-          },
-          {
-            id: 3,
-            type: 'success',
-            title: 'Positive Cash Flow',
-            message: 'Monthly cash flow trending positive',
-            priority: 'low'
-          }
-        ]
+        pendingApprovals: formattedApprovals,
+        recentTransactions: formattedTransactions,
+        alerts: alerts
       });
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+      // Set empty/default data on error
+      setDashboardData({
+        kpis: {
+          cashBalance: 0,
+          pendingPayments: 0,
+          accountsReceivable: 0,
+          todaysSales: 0,
+          cashFlow: 0,
+          monthlyRevenue: 0
+        },
+        pendingApprovals: [],
+        recentTransactions: [],
+        alerts: [{
+          id: 1,
+          type: 'warning',
+          title: 'Connection Error',
+          message: 'Unable to load dashboard data',
+          priority: 'high'
+        }]
+      });
+    } finally {
       setLoading(false);
-    }, 800);
+    }
   };
 
   const formatCurrency = (amount) => {
@@ -418,6 +414,20 @@ const FinanceDashboard = () => {
               >
                 <FileText className="w-6 h-6" />
                 <span className="text-sm">Financial Reports</span>
+              </Button>
+              <Button 
+                className="bg-emerald-600 hover:bg-emerald-700 text-white h-auto py-4 flex flex-col gap-2"
+                onClick={() => navigate('/finance/income-recording')}
+              >
+                <DollarSign className="w-6 h-6" />
+                <span className="text-sm">Record Income</span>
+              </Button>
+              <Button 
+                className="bg-red-600 hover:bg-red-700 text-white h-auto py-4 flex flex-col gap-2"
+                onClick={() => navigate('/finance/expense-recording')}
+              >
+                <TrendingDown className="w-6 h-6" />
+                <span className="text-sm">Record Expense</span>
               </Button>
             </div>
           </CardContent>

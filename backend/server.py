@@ -62,6 +62,7 @@ class InternalOrderStatus(str, Enum):
     MANAGER_APPROVED = "manager_approved"
     PENDING_FULFILLMENT = "pending_fulfillment"
     READY_FOR_PICKUP = "ready_for_pickup"
+    PENDING_GATE_APPROVAL = "pending_gate_approval"
     AT_GATE = "at_gate"
     IN_TRANSIT = "in_transit"
     DELIVERED = "delivered"
@@ -117,6 +118,48 @@ class PaymentHistoryRating(str, Enum):
     GOOD = "good"
     FAIR = "fair"
     POOR = "poor"
+
+# Finance-specific Enums
+class IncomeCategory(str, Enum):
+    SALES_REVENUE = "sales_revenue"
+    LOAN_PAYMENT = "loan_payment"
+    BANK_INTEREST = "bank_interest"
+    REFUND = "refund"
+    ASSET_SALE = "asset_sale"
+    INVESTMENT_INCOME = "investment_income"
+    OTHER_INCOME = "other_income"
+
+class ExpenseCategory(str, Enum):
+    PURCHASE_PAYMENT = "purchase_payment"
+    SALARY = "salary"
+    UTILITY = "utility"
+    RENT = "rent"
+    DEPRECIATION = "depreciation"
+    TAX = "tax"
+    MAINTENANCE = "maintenance"
+    TRANSPORTATION = "transportation"
+    OTHER_EXPENSE = "other_expense"
+
+class FinancePaymentMethod(str, Enum):
+    CASH = "cash"
+    BANK_TRANSFER = "bank_transfer"
+    CHECK = "check"
+    MOBILE_MONEY = "mobile_money"
+
+class ReconciliationStatus(str, Enum):
+    UNRECONCILED = "unreconciled"
+    RECONCILED = "reconciled"
+    DISPUTED = "disputed"
+    ADJUSTED = "adjusted"
+
+class DailyReconciliationStatus(str, Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    DISPUTED = "disputed"
+
+class FinanceTransactionType(str, Enum):
+    INCOME = "income"
+    EXPENSE = "expense"
 
 
 # Define Models
@@ -375,6 +418,9 @@ class FulfillmentAction(BaseModel):
     packing_slip_number: Optional[str] = None
     actual_quantity: Optional[int] = None
     notes: Optional[str] = None
+    gate_pass_number: Optional[str] = None
+    vehicle_number: Optional[str] = None
+    driver_name: Optional[str] = None
 
 class GateVerificationAction(BaseModel):
     verified_by: str
@@ -586,6 +632,184 @@ class LoanPaymentCreate(BaseModel):
     received_by: str
     receipt_number: Optional[str] = None
     notes: Optional[str] = None
+
+
+# Finance Models
+class FinanceTransaction(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    transaction_number: str
+    type: FinanceTransactionType  # income or expense
+    category: Optional[str] = None  # From IncomeCategory or ExpenseCategory
+    amount: float
+    payment_method: FinancePaymentMethod
+    
+    # Source tracking
+    source_type: Optional[str] = None  # sales, loan_payment, purchase, manual, etc.
+    source_id: Optional[str] = None  # ID of the source transaction
+    source_reference: Optional[str] = None  # Reference number
+    
+    # Party information
+    party_name: Optional[str] = None  # Customer, supplier, employee name
+    party_contact: Optional[str] = None
+    
+    # Branch and account info
+    branch_id: Optional[str] = None
+    account_type: Optional[str] = None  # cash, bank, etc.
+    bank_account: Optional[str] = None  # Bank account used
+    
+    # Description and documentation
+    description: str
+    reference_number: Optional[str] = None  # Check number, transfer ref, etc.
+    supporting_documents: List[str] = []  # Document references
+    
+    # Accountability fields
+    processed_by: str  # Finance officer who processed this
+    approved_by: Optional[str] = None  # Who approved (for expenses)
+    
+    # Reconciliation
+    reconciliation_status: ReconciliationStatus = ReconciliationStatus.UNRECONCILED
+    reconciled_by: Optional[str] = None
+    reconciliation_date: Optional[datetime] = None
+    reconciliation_notes: Optional[str] = None
+    
+    # Timestamps
+    transaction_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class FinanceTransactionCreate(BaseModel):
+    type: FinanceTransactionType
+    category: str
+    amount: float
+    payment_method: FinancePaymentMethod
+    party_name: Optional[str] = None
+    party_contact: Optional[str] = None
+    branch_id: Optional[str] = None
+    account_type: Optional[str] = None
+    bank_account: Optional[str] = None
+    description: str
+    reference_number: Optional[str] = None
+    supporting_documents: List[str] = []
+    processed_by: str
+    transaction_date: Optional[datetime] = None
+
+
+class DailyReconciliation(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    reconciliation_number: str
+    
+    # Date and branch
+    reconciliation_date: datetime
+    branch_id: str
+    
+    # Cash amounts
+    expected_cash: float  # From POS transactions (cash + mobile money)
+    actual_cash: float  # Counted by sales person
+    variance: float  # Difference (positive = overage, negative = shortage)
+    
+    # Transaction breakdown
+    total_sales: float  # Total sales for the day
+    cash_sales: float  # Cash transactions
+    mobile_money_sales: float  # Mobile money transactions
+    loan_sales: float  # Credit/loan transactions
+    transaction_count: int  # Number of transactions
+    
+    # Related transactions
+    transaction_ids: List[str] = []  # IDs of sales transactions included
+    
+    # Submission info
+    submitted_by: str  # Sales person who submitted
+    submitted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    submission_notes: Optional[str] = None
+    
+    # Verification info
+    status: DailyReconciliationStatus = DailyReconciliationStatus.PENDING
+    verified_by: Optional[str] = None  # Finance officer who verified
+    verified_at: Optional[datetime] = None
+    verification_notes: Optional[str] = None
+    
+    # Variance handling
+    variance_explanation: Optional[str] = None
+    variance_adjustment_id: Optional[str] = None  # Finance transaction ID if variance recorded
+    
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class DailyReconciliationCreate(BaseModel):
+    reconciliation_date: datetime
+    branch_id: str
+    actual_cash: float
+    submitted_by: str
+    submission_notes: Optional[str] = None
+
+class DailyReconciliationVerify(BaseModel):
+    status: DailyReconciliationStatus
+    verified_by: str
+    verification_notes: Optional[str] = None
+    variance_explanation: Optional[str] = None
+
+
+class ExpenseRecord(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    expense_number: str
+    
+    # Expense details
+    category: ExpenseCategory
+    amount: float
+    payment_method: FinancePaymentMethod
+    
+    # Payee information
+    payee_name: str
+    payee_contact: Optional[str] = None
+    payee_account: Optional[str] = None
+    
+    # Payment details
+    payment_date: datetime
+    reference_number: Optional[str] = None  # Check number, transfer ref
+    bank_account: Optional[str] = None  # Bank account used for payment
+    
+    # Allocation
+    branch_id: Optional[str] = None  # Which branch/department
+    account_allocation: Optional[str] = None  # Chart of accounts reference
+    
+    # Description and documentation
+    description: str
+    supporting_documents: List[str] = []
+    
+    # Approval and processing
+    requested_by: Optional[str] = None  # Who requested this expense
+    approved_by: Optional[str] = None  # Who approved
+    processed_by: str  # Finance officer who processed
+    
+    # Related records
+    purchase_requisition_id: Optional[str] = None  # If related to PR
+    finance_transaction_id: Optional[str] = None  # Link to finance transaction
+    
+    # Timestamps
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ExpenseRecordCreate(BaseModel):
+    category: ExpenseCategory
+    amount: float
+    payment_method: FinancePaymentMethod
+    payee_name: str
+    payee_contact: Optional[str] = None
+    payee_account: Optional[str] = None
+    payment_date: datetime
+    reference_number: Optional[str] = None
+    bank_account: Optional[str] = None
+    branch_id: Optional[str] = None
+    account_allocation: Optional[str] = None
+    description: str
+    supporting_documents: List[str] = []
+    processed_by: str
 
 
 # Helper function to serialize datetime fields
@@ -1324,7 +1548,61 @@ async def get_manager_queue(branch_id: Optional[str] = None):
 @api_router.post("/inventory-requests/{order_id}/approve")
 async def approve_inventory_request(order_id: str, approval: ManagerApprovalAction):
     """Legacy endpoint - redirects to new manager approval workflow"""
-    return await approve_stock_request_manager(order_id, approval)
+    # Find the stock request
+    request = await db.stock_requests.find_one({"id": order_id}, {"_id": 0})
+    
+    if not request:
+        raise HTTPException(status_code=404, detail="Stock request not found")
+    
+    if request["status"] != InternalOrderStatus.PENDING_MANAGER_APPROVAL:
+        raise HTTPException(status_code=400, detail="Request not in pending manager approval state")
+    
+    # Create approval record
+    approval_record = ApprovalRecord(
+        approved_by=approval.approved_by,
+        notes=approval.notes
+    )
+    
+    # Update request
+    update_data = {
+        "status": InternalOrderStatus.MANAGER_APPROVED,
+        "manager_approval": serialize_datetime(approval_record.model_dump())
+    }
+    
+    workflow_entry = {
+        "stage": "manager_approval",
+        "status": "approved",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "actor": approval.approved_by,
+        "action": "Approved by Manager",
+        "notes": approval.notes or ""
+    }
+    
+    await db.stock_requests.update_one(
+        {"id": order_id},
+        {
+            "$set": update_data,
+            "$push": {"workflow_history": workflow_entry}
+        }
+    )
+    
+    await log_audit(
+        user=approval.approved_by,
+        action="approve_stock_request_manager",
+        entity_type="stock_request",
+        entity_id=order_id,
+        details={"notes": approval.notes}
+    )
+    
+    # Move to pending fulfillment
+    await db.stock_requests.update_one(
+        {"id": order_id},
+        {"$set": {"status": InternalOrderStatus.PENDING_FULFILLMENT}}
+    )
+    
+    updated = await db.stock_requests.find_one({"id": order_id}, {"_id": 0})
+    deserialize_datetime(updated)
+    return updated
 
 @api_router.post("/milling-orders", response_model=MillingOrder)
 async def create_milling_order(order: MillingOrderCreate):
@@ -2002,8 +2280,9 @@ async def fulfill_stock_request(request_id: str, fulfillment: FulfillmentAction)
         fulfillment.fulfilled_by
     )
     
-    # Generate packing slip number
+    # Generate packing slip and gate pass numbers
     packing_slip = fulfillment.packing_slip_number or f"PS-{request['request_number']}"
+    gate_pass = fulfillment.gate_pass_number or f"GP-{request['request_number']}"
     
     fulfillment_record = {
         "fulfilled_by": fulfillment.fulfilled_by,
@@ -2013,21 +2292,33 @@ async def fulfill_stock_request(request_id: str, fulfillment: FulfillmentAction)
         "notes": fulfillment.notes or ""
     }
     
+    # Store gate pass info (generated by storekeeper)
+    gate_pass_draft = {
+        "gate_pass_number": gate_pass,
+        "vehicle_number": fulfillment.vehicle_number,
+        "driver_name": fulfillment.driver_name,
+        "created_by": fulfillment.fulfilled_by,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "status": "pending_approval"
+    }
+    
     workflow_entry = {
         "stage": "fulfillment",
         "status": "completed",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "actor": fulfillment.fulfilled_by,
-        "action": "Fulfilled by Storekeeper",
+        "action": "Fulfilled by Storekeeper with Gate Pass",
         "notes": fulfillment.notes or ""
     }
     
+    # Change status to pending_gate_approval (manager must approve gate pass)
     await db.stock_requests.update_one(
         {"id": request_id},
         {
             "$set": {
-                "status": InternalOrderStatus.READY_FOR_PICKUP,
+                "status": InternalOrderStatus.PENDING_GATE_APPROVAL,
                 "fulfillment": fulfillment_record,
+                "gate_pass_draft": gate_pass_draft,
                 "inventory_deducted": True
             },
             "$push": {"workflow_history": workflow_entry}
@@ -2040,6 +2331,59 @@ async def fulfill_stock_request(request_id: str, fulfillment: FulfillmentAction)
         entity_type="stock_request",
         entity_id=request_id,
         details={"packing_slip": packing_slip}
+    )
+    
+    updated = await db.stock_requests.find_one({"id": request_id}, {"_id": 0})
+    deserialize_datetime(updated)
+    return updated
+
+
+@api_router.put("/stock-requests/{request_id}/approve-gate-pass")
+async def approve_gate_pass(request_id: str, approval: ManagerApprovalAction):
+    """Manager approves gate pass for release"""
+    request = await db.stock_requests.find_one({"id": request_id}, {"_id": 0})
+    
+    if not request:
+        raise HTTPException(status_code=404, detail="Stock request not found")
+    
+    if request["status"] != InternalOrderStatus.PENDING_GATE_APPROVAL:
+        raise HTTPException(status_code=400, detail="Request not pending gate approval")
+    
+    # Approve gate pass and mark as ready for guard
+    gate_pass = request.get("gate_pass_draft", {})
+    gate_pass["approved_by"] = approval.approved_by
+    gate_pass["approved_at"] = datetime.now(timezone.utc).isoformat()
+    gate_pass["status"] = "approved"
+    gate_pass["approval_notes"] = approval.notes or ""
+    
+    workflow_entry = {
+        "stage": "gate_pass_approval",
+        "status": "approved",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "actor": approval.approved_by,
+        "action": "Gate Pass Approved by Manager",
+        "notes": approval.notes or ""
+    }
+    
+    # Move to in_transit (ready for physical guard check)
+    await db.stock_requests.update_one(
+        {"id": request_id},
+        {
+            "$set": {
+                "status": InternalOrderStatus.IN_TRANSIT,
+                "gate_verification": gate_pass
+            },
+            "$unset": {"gate_pass_draft": ""},
+            "$push": {"workflow_history": workflow_entry}
+        }
+    )
+    
+    await log_audit(
+        user=approval.approved_by,
+        action="approve_gate_pass",
+        entity_type="stock_request",
+        entity_id=request_id,
+        details={"gate_pass": gate_pass["gate_pass_number"]}
     )
     
     updated = await db.stock_requests.find_one({"id": request_id}, {"_id": 0})
@@ -2411,6 +2755,828 @@ async def get_finance_summary(branch_id: Optional[str] = None):
     summary["net_balance"] = summary["total_income"] - summary["total_expense"]
     
     return summary
+
+
+# ==================== FINANCE API ENDPOINTS ====================
+
+# Income Recording Endpoints
+@api_router.post("/finance/income/cash-receipt", response_model=FinanceTransaction)
+async def record_cash_receipt(transaction: FinanceTransactionCreate):
+    """Record non-sales cash receipts (refunds, interest, misc income)"""
+    
+    # Generate transaction number
+    txn_count = await db.finance_transactions.count_documents({})
+    transaction_number = f"FIN-{txn_count + 1:06d}"
+    
+    # Create finance transaction
+    finance_txn = FinanceTransaction(
+        transaction_number=transaction_number,
+        type=FinanceTransactionType.INCOME,
+        category=transaction.category,
+        amount=transaction.amount,
+        payment_method=transaction.payment_method,
+        party_name=transaction.party_name,
+        party_contact=transaction.party_contact,
+        branch_id=transaction.branch_id,
+        account_type=transaction.account_type,
+        bank_account=transaction.bank_account,
+        description=transaction.description,
+        reference_number=transaction.reference_number,
+        supporting_documents=transaction.supporting_documents,
+        processed_by=transaction.processed_by,
+        source_type="manual_income",
+        transaction_date=transaction.transaction_date or datetime.now(timezone.utc)
+    )
+    
+    # Save to database
+    txn_dict = finance_txn.model_dump()
+    serialize_datetime(txn_dict)
+    await db.finance_transactions.insert_one(txn_dict)
+    
+    # Audit log
+    await log_audit(
+        user=transaction.processed_by,
+        action="record_income",
+        entity_type="finance_transaction",
+        entity_id=finance_txn.id,
+        details={
+            "category": transaction.category,
+            "amount": transaction.amount,
+            "description": transaction.description
+        }
+    )
+    
+    return finance_txn
+
+
+@api_router.get("/finance/income")
+async def get_income_transactions(
+    branch_id: Optional[str] = None,
+    category: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    limit: int = 100
+):
+    """List all income transactions with filters"""
+    query = {"type": "income"}
+    
+    if branch_id:
+        query["branch_id"] = branch_id
+    if category:
+        query["category"] = category
+    
+    if start_date and end_date:
+        try:
+            start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+            end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+            query["transaction_date"] = {"$gte": start_dt.isoformat(), "$lte": end_dt.isoformat()}
+        except ValueError:
+            pass
+    
+    transactions = await db.finance_transactions.find(
+        query, {"_id": 0}
+    ).sort("transaction_date", -1).limit(limit).to_list(limit)
+    
+    return transactions
+
+
+@api_router.get("/finance/income/summary")
+async def get_income_summary(
+    branch_id: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None
+):
+    """Get income summary by category"""
+    query = {"type": "income"}
+    
+    if branch_id:
+        query["branch_id"] = branch_id
+    
+    if start_date and end_date:
+        try:
+            start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+            end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+            query["transaction_date"] = {"$gte": start_dt.isoformat(), "$lte": end_dt.isoformat()}
+        except ValueError:
+            pass
+    
+    transactions = await db.finance_transactions.find(query, {"_id": 0}).to_list(10000)
+    
+    # Group by category
+    summary = {}
+    total = 0.0
+    
+    for txn in transactions:
+        category = txn.get("category", "uncategorized")
+        amount = txn.get("amount", 0)
+        
+        if category not in summary:
+            summary[category] = {"count": 0, "total": 0.0}
+        
+        summary[category]["count"] += 1
+        summary[category]["total"] += amount
+        total += amount
+    
+    return {
+        "by_category": summary,
+        "total_income": total,
+        "transaction_count": len(transactions)
+    }
+
+
+# Expense Recording Endpoints
+@api_router.post("/finance/expenses/record", response_model=ExpenseRecord)
+async def record_expense(expense: ExpenseRecordCreate):
+    """Record expense (salary, utility, rent, tax, etc.)"""
+    
+    # Generate expense number
+    expense_count = await db.expense_records.count_documents({})
+    expense_number = f"EXP-{expense_count + 1:06d}"
+    
+    # Generate finance transaction number
+    txn_count = await db.finance_transactions.count_documents({})
+    transaction_number = f"FIN-{txn_count + 1:06d}"
+    
+    # Create finance transaction
+    finance_txn = FinanceTransaction(
+        transaction_number=transaction_number,
+        type=FinanceTransactionType.EXPENSE,
+        category=expense.category.value,
+        amount=expense.amount,
+        payment_method=expense.payment_method,
+        party_name=expense.payee_name,
+        party_contact=expense.payee_contact,
+        branch_id=expense.branch_id,
+        bank_account=expense.bank_account,
+        description=expense.description,
+        reference_number=expense.reference_number,
+        supporting_documents=expense.supporting_documents,
+        processed_by=expense.processed_by,
+        source_type="manual_expense",
+        transaction_date=expense.payment_date
+    )
+    
+    # Save finance transaction
+    txn_dict = finance_txn.model_dump()
+    serialize_datetime(txn_dict)
+    await db.finance_transactions.insert_one(txn_dict)
+    
+    # Create expense record
+    expense_record = ExpenseRecord(
+        expense_number=expense_number,
+        category=expense.category,
+        amount=expense.amount,
+        payment_method=expense.payment_method,
+        payee_name=expense.payee_name,
+        payee_contact=expense.payee_contact,
+        payee_account=expense.payee_account,
+        payment_date=expense.payment_date,
+        reference_number=expense.reference_number,
+        bank_account=expense.bank_account,
+        branch_id=expense.branch_id,
+        account_allocation=expense.account_allocation,
+        description=expense.description,
+        supporting_documents=expense.supporting_documents,
+        processed_by=expense.processed_by,
+        finance_transaction_id=finance_txn.id
+    )
+    
+    # Save expense record
+    expense_dict = expense_record.model_dump()
+    serialize_datetime(expense_dict)
+    await db.expense_records.insert_one(expense_dict)
+    
+    # Audit log
+    await log_audit(
+        user=expense.processed_by,
+        action="record_expense",
+        entity_type="expense_record",
+        entity_id=expense_record.id,
+        details={
+            "category": expense.category.value,
+            "amount": expense.amount,
+            "payee": expense.payee_name
+        }
+    )
+    
+    return expense_record
+
+
+@api_router.get("/finance/expenses")
+async def get_expenses(
+    branch_id: Optional[str] = None,
+    category: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    limit: int = 100
+):
+    """List expenses with filters"""
+    query = {}
+    
+    if branch_id:
+        query["branch_id"] = branch_id
+    if category:
+        query["category"] = category
+    
+    if start_date and end_date:
+        try:
+            start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+            end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+            query["payment_date"] = {"$gte": start_dt.isoformat(), "$lte": end_dt.isoformat()}
+        except ValueError:
+            pass
+    
+    expenses = await db.expense_records.find(
+        query, {"_id": 0}
+    ).sort("payment_date", -1).limit(limit).to_list(limit)
+    
+    return expenses
+
+
+@api_router.get("/finance/expenses/summary")
+async def get_expense_summary(
+    branch_id: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None
+):
+    """Get expense breakdown by category"""
+    query = {}
+    
+    if branch_id:
+        query["branch_id"] = branch_id
+    
+    if start_date and end_date:
+        try:
+            start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+            end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+            query["payment_date"] = {"$gte": start_dt.isoformat(), "$lte": end_dt.isoformat()}
+        except ValueError:
+            pass
+    
+    expenses = await db.expense_records.find(query, {"_id": 0}).to_list(10000)
+    
+    # Group by category
+    summary = {}
+    total = 0.0
+    
+    for expense in expenses:
+        category = expense.get("category", "uncategorized")
+        amount = expense.get("amount", 0)
+        
+        if category not in summary:
+            summary[category] = {"count": 0, "total": 0.0}
+        
+        summary[category]["count"] += 1
+        summary[category]["total"] += amount
+        total += amount
+    
+    return {
+        "by_category": summary,
+        "total_expense": total,
+        "expense_count": len(expenses)
+    }
+
+
+# Purchase Authorization Endpoints
+@api_router.get("/finance/pending-authorizations")
+async def get_pending_authorizations():
+    """Get owner-approved purchase requests needing finance authorization"""
+    
+    # Get owner-approved purchase requisitions
+    prs = await db.purchase_requisitions.find(
+        {"status": "owner_approved"},
+        {"_id": 0}
+    ).sort("requested_at", 1).to_list(100)
+    
+    return prs
+
+
+@api_router.post("/finance/authorize-payment/{pr_id}")
+async def authorize_payment(pr_id: str, authorization: Dict):
+    """Finance authorizes payment for purchase requisition"""
+    
+    pr = await db.purchase_requisitions.find_one({"id": pr_id}, {"_id": 0})
+    if not pr:
+        raise HTTPException(status_code=404, detail="Purchase requisition not found")
+    
+    if pr.get("status") != "owner_approved":
+        raise HTTPException(status_code=400, detail="Purchase requisition must be owner-approved")
+    
+    # Update PR with finance authorization
+    await db.purchase_requisitions.update_one(
+        {"id": pr_id},
+        {
+            "$set": {
+                "finance_authorized": True,
+                "finance_authorized_by": authorization.get("authorized_by"),
+                "finance_authorized_at": datetime.now(timezone.utc).isoformat(),
+                "finance_authorization_notes": authorization.get("notes"),
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+        }
+    )
+    
+    # Audit log
+    await log_audit(
+        user=authorization.get("authorized_by"),
+        action="authorize_payment",
+        entity_type="purchase_requisition",
+        entity_id=pr_id,
+        details={
+            "amount": pr.get("estimated_cost"),
+            "notes": authorization.get("notes")
+        }
+    )
+    
+    updated_pr = await db.purchase_requisitions.find_one({"id": pr_id}, {"_id": 0})
+    return updated_pr
+
+
+@api_router.post("/finance/process-payment/{pr_id}")
+async def process_payment(pr_id: str, payment_details: Dict):
+    """Process actual payment for authorized purchase requisition"""
+    
+    pr = await db.purchase_requisitions.find_one({"id": pr_id}, {"_id": 0})
+    if not pr:
+        raise HTTPException(status_code=404, detail="Purchase requisition not found")
+    
+    if pr.get("status") != "owner_approved":
+        raise HTTPException(status_code=400, detail="Purchase requisition must be owner-approved")
+    
+    # Generate finance transaction number
+    txn_count = await db.finance_transactions.count_documents({})
+    transaction_number = f"FIN-{txn_count + 1:06d}"
+    
+    # Create finance transaction for payment
+    finance_txn = {
+        "id": str(uuid.uuid4()),
+        "transaction_number": transaction_number,
+        "type": "expense",
+        "category": "purchase_payment",
+        "amount": payment_details.get("amount", pr.get("estimated_cost")),
+        "payment_method": payment_details.get("payment_method"),
+        "party_name": pr.get("vendor_name"),
+        "party_contact": pr.get("vendor_contact"),
+        "branch_id": pr.get("branch_id"),
+        "bank_account": payment_details.get("bank_account"),
+        "description": f"Payment for {pr.get('description')}",
+        "reference_number": payment_details.get("reference_number"),
+        "processed_by": payment_details.get("processed_by"),
+        "source_type": "purchase",
+        "source_id": pr_id,
+        "source_reference": pr.get("request_number"),
+        "transaction_date": payment_details.get("payment_date", datetime.now(timezone.utc).isoformat()),
+        "reconciliation_status": "unreconciled",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.finance_transactions.insert_one(finance_txn)
+    
+    # Update purchase requisition status
+    await db.purchase_requisitions.update_one(
+        {"id": pr_id},
+        {
+            "$set": {
+                "status": "purchased",
+                "payment_processed": True,
+                "payment_processed_by": payment_details.get("processed_by"),
+                "payment_processed_at": datetime.now(timezone.utc).isoformat(),
+                "payment_method": payment_details.get("payment_method"),
+                "payment_reference": payment_details.get("reference_number"),
+                "finance_transaction_id": finance_txn["id"],
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+        }
+    )
+    
+    # Audit log
+    await log_audit(
+        user=payment_details.get("processed_by"),
+        action="process_payment",
+        entity_type="purchase_requisition",
+        entity_id=pr_id,
+        details={
+            "amount": payment_details.get("amount"),
+            "payment_method": payment_details.get("payment_method"),
+            "reference": payment_details.get("reference_number")
+        }
+    )
+    
+    return {"success": True, "finance_transaction": finance_txn, "purchase_requisition_updated": True}
+
+
+@api_router.get("/finance/payment-history")
+async def get_payment_history(limit: int = 100):
+    """Get complete payment history"""
+    
+    payments = await db.finance_transactions.find(
+        {
+            "type": "expense",
+            "category": "purchase_payment"
+        },
+        {"_id": 0}
+    ).sort("transaction_date", -1).limit(limit).to_list(limit)
+    
+    return payments
+
+
+# Daily Reconciliation Endpoints
+@api_router.post("/finance/reconciliation/submit", response_model=DailyReconciliation)
+async def submit_daily_reconciliation(reconciliation: DailyReconciliationCreate):
+    """Sales submits end-of-day cash count"""
+    
+    # Generate reconciliation number
+    recon_count = await db.daily_reconciliations.count_documents({})
+    reconciliation_number = f"RECON-{recon_count + 1:06d}"
+    
+    # Get sales transactions for the day and branch
+    start_of_day = reconciliation.reconciliation_date.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_of_day = reconciliation.reconciliation_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+    
+    sales_txns = await db.sales_transactions.find({
+        "branch_id": reconciliation.branch_id,
+        "timestamp": {
+            "$gte": start_of_day.isoformat(),
+            "$lte": end_of_day.isoformat()
+        }
+    }, {"_id": 0}).to_list(1000)
+    
+    # Calculate expected amounts
+    total_sales = 0.0
+    cash_sales = 0.0
+    mobile_money_sales = 0.0
+    loan_sales = 0.0
+    transaction_ids = []
+    
+    for txn in sales_txns:
+        amount = txn.get("total_amount", 0)
+        total_sales += amount
+        transaction_ids.append(txn.get("id"))
+        
+        payment_type = txn.get("payment_type", "")
+        if payment_type == "cash":
+            cash_sales += amount
+        elif payment_type == "transfer":  # mobile money
+            mobile_money_sales += amount
+        elif payment_type == "loan":
+            loan_sales += amount
+    
+    expected_cash = cash_sales + mobile_money_sales
+    variance = reconciliation.actual_cash - expected_cash
+    
+    # Create reconciliation record
+    daily_recon = DailyReconciliation(
+        reconciliation_number=reconciliation_number,
+        reconciliation_date=reconciliation.reconciliation_date,
+        branch_id=reconciliation.branch_id,
+        expected_cash=expected_cash,
+        actual_cash=reconciliation.actual_cash,
+        variance=variance,
+        total_sales=total_sales,
+        cash_sales=cash_sales,
+        mobile_money_sales=mobile_money_sales,
+        loan_sales=loan_sales,
+        transaction_count=len(sales_txns),
+        transaction_ids=transaction_ids,
+        submitted_by=reconciliation.submitted_by,
+        submission_notes=reconciliation.submission_notes,
+        status=DailyReconciliationStatus.PENDING
+    )
+    
+    # Save to database
+    recon_dict = daily_recon.model_dump()
+    serialize_datetime(recon_dict)
+    await db.daily_reconciliations.insert_one(recon_dict)
+    
+    # Audit log
+    await log_audit(
+        user=reconciliation.submitted_by,
+        action="submit_reconciliation",
+        entity_type="daily_reconciliation",
+        entity_id=daily_recon.id,
+        details={
+            "branch": reconciliation.branch_id,
+            "expected": expected_cash,
+            "actual": reconciliation.actual_cash,
+            "variance": variance
+        }
+    )
+    
+    return daily_recon
+
+
+@api_router.get("/finance/reconciliation/pending")
+async def get_pending_reconciliations():
+    """Get pending reconciliations for Finance to verify"""
+    
+    reconciliations = await db.daily_reconciliations.find(
+        {"status": "pending"},
+        {"_id": 0}
+    ).sort("reconciliation_date", -1).to_list(100)
+    
+    return reconciliations
+
+
+@api_router.post("/finance/reconciliation/{recon_id}/verify")
+async def verify_reconciliation(recon_id: str, verification: DailyReconciliationVerify):
+    """Finance verifies and approves reconciliation"""
+    
+    recon = await db.daily_reconciliations.find_one({"id": recon_id}, {"_id": 0})
+    if not recon:
+        raise HTTPException(status_code=404, detail="Reconciliation not found")
+    
+    # Update reconciliation
+    await db.daily_reconciliations.update_one(
+        {"id": recon_id},
+        {
+            "$set": {
+                "status": verification.status.value,
+                "verified_by": verification.verified_by,
+                "verified_at": datetime.now(timezone.utc).isoformat(),
+                "verification_notes": verification.verification_notes,
+                "variance_explanation": verification.variance_explanation,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+        }
+    )
+    
+    # If approved, update related transactions to reconciled
+    if verification.status == DailyReconciliationStatus.APPROVED:
+        transaction_ids = recon.get("transaction_ids", [])
+        
+        # Update all sales transactions
+        for txn_id in transaction_ids:
+            await db.sales_transactions.update_one(
+                {"id": txn_id},
+                {"$set": {"reconciled": True, "reconciled_at": datetime.now(timezone.utc).isoformat()}}
+            )
+        
+        # Update related finance transactions
+        await db.finance_transactions.update_many(
+            {"source_id": {"$in": transaction_ids}},
+            {
+                "$set": {
+                    "reconciliation_status": "reconciled",
+                    "reconciled_by": verification.verified_by,
+                    "reconciliation_date": datetime.now(timezone.utc).isoformat(),
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }
+            }
+        )
+        
+        # If there's a variance, record it as a finance transaction
+        variance = recon.get("variance", 0)
+        if abs(variance) > 0.01:  # If variance is significant (more than 1 cent)
+            txn_count = await db.finance_transactions.count_documents({})
+            transaction_number = f"FIN-{txn_count + 1:06d}"
+            
+            variance_txn = {
+                "id": str(uuid.uuid4()),
+                "transaction_number": transaction_number,
+                "type": "expense" if variance < 0 else "income",
+                "category": "other_expense" if variance < 0 else "other_income",
+                "amount": abs(variance),
+                "payment_method": "cash",
+                "branch_id": recon.get("branch_id"),
+                "description": f"Cash variance from reconciliation {recon.get('reconciliation_number')}: {'shortage' if variance < 0 else 'overage'}",
+                "processed_by": verification.verified_by,
+                "source_type": "reconciliation_variance",
+                "source_id": recon_id,
+                "source_reference": recon.get("reconciliation_number"),
+                "reconciliation_status": "reconciled",
+                "transaction_date": datetime.now(timezone.utc).isoformat(),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+            
+            await db.finance_transactions.insert_one(variance_txn)
+            
+            # Update reconciliation with variance adjustment ID
+            await db.daily_reconciliations.update_one(
+                {"id": recon_id},
+                {"$set": {"variance_adjustment_id": variance_txn["id"]}}
+            )
+    
+    # Audit log
+    await log_audit(
+        user=verification.verified_by,
+        action="verify_reconciliation",
+        entity_type="daily_reconciliation",
+        entity_id=recon_id,
+        details={
+            "status": verification.status.value,
+            "variance": recon.get("variance"),
+            "notes": verification.verification_notes
+        }
+    )
+    
+    updated_recon = await db.daily_reconciliations.find_one({"id": recon_id}, {"_id": 0})
+    return updated_recon
+
+
+@api_router.get("/finance/reconciliation/history")
+async def get_reconciliation_history(
+    branch_id: Optional[str] = None,
+    status: Optional[str] = None,
+    limit: int = 100
+):
+    """Get historical reconciliation records"""
+    query = {}
+    
+    if branch_id:
+        query["branch_id"] = branch_id
+    if status:
+        query["status"] = status
+    
+    reconciliations = await db.daily_reconciliations.find(
+        query, {"_id": 0}
+    ).sort("reconciliation_date", -1).limit(limit).to_list(limit)
+    
+    return reconciliations
+
+
+# Financial Reports & Accountability
+@api_router.get("/finance/reports/cash-flow")
+async def get_cash_flow_report(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    branch_id: Optional[str] = None
+):
+    """Cash flow statement (income vs expenses)"""
+    query = {}
+    
+    if branch_id:
+        query["branch_id"] = branch_id
+    
+    if start_date and end_date:
+        try:
+            start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+            end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+            query["transaction_date"] = {"$gte": start_dt.isoformat(), "$lte": end_dt.isoformat()}
+        except ValueError:
+            pass
+    
+    transactions = await db.finance_transactions.find(query, {"_id": 0}).to_list(10000)
+    
+    income_total = 0.0
+    expense_total = 0.0
+    income_by_category = {}
+    expense_by_category = {}
+    
+    for txn in transactions:
+        amount = txn.get("amount", 0)
+        category = txn.get("category", "uncategorized")
+        txn_type = txn.get("type")
+        
+        if txn_type == "income":
+            income_total += amount
+            if category not in income_by_category:
+                income_by_category[category] = 0.0
+            income_by_category[category] += amount
+        else:
+            expense_total += amount
+            if category not in expense_by_category:
+                expense_by_category[category] = 0.0
+            expense_by_category[category] += amount
+    
+    net_cash_flow = income_total - expense_total
+    
+    return {
+        "total_income": income_total,
+        "total_expense": expense_total,
+        "net_cash_flow": net_cash_flow,
+        "income_by_category": income_by_category,
+        "expense_by_category": expense_by_category,
+        "period": {"start": start_date, "end": end_date}
+    }
+
+
+@api_router.get("/finance/reports/daily-summary")
+async def get_daily_summary(date: Optional[str] = None, branch_id: Optional[str] = None):
+    """Daily financial activity summary"""
+    
+    if date:
+        target_date = datetime.fromisoformat(date.replace('Z', '+00:00'))
+    else:
+        target_date = datetime.now(timezone.utc)
+    
+    start_of_day = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_of_day = target_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+    
+    query = {
+        "transaction_date": {
+            "$gte": start_of_day.isoformat(),
+            "$lte": end_of_day.isoformat()
+        }
+    }
+    
+    if branch_id:
+        query["branch_id"] = branch_id
+    
+    transactions = await db.finance_transactions.find(query, {"_id": 0}).to_list(1000)
+    
+    income_total = 0.0
+    expense_total = 0.0
+    transaction_count = len(transactions)
+    
+    for txn in transactions:
+        if txn.get("type") == "income":
+            income_total += txn.get("amount", 0)
+        else:
+            expense_total += txn.get("amount", 0)
+    
+    # Get reconciliation status
+    recon = await db.daily_reconciliations.find_one({
+        "reconciliation_date": {
+            "$gte": start_of_day.isoformat(),
+            "$lte": end_of_day.isoformat()
+        },
+        "branch_id": branch_id
+    }, {"_id": 0})
+    
+    return {
+        "date": target_date.date().isoformat(),
+        "branch_id": branch_id,
+        "total_income": income_total,
+        "total_expense": expense_total,
+        "net": income_total - expense_total,
+        "transaction_count": transaction_count,
+        "reconciliation": recon
+    }
+
+
+@api_router.get("/finance/reports/accountability")
+async def get_accountability_report(
+    finance_officer: str,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None
+):
+    """Finance officer accountability report (all transactions they processed)"""
+    query = {"processed_by": finance_officer}
+    
+    if start_date and end_date:
+        try:
+            start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+            end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+            query["transaction_date"] = {"$gte": start_dt.isoformat(), "$lte": end_dt.isoformat()}
+        except ValueError:
+            pass
+    
+    transactions = await db.finance_transactions.find(query, {"_id": 0}).to_list(10000)
+    
+    total_income_processed = 0.0
+    total_expense_processed = 0.0
+    
+    for txn in transactions:
+        if txn.get("type") == "income":
+            total_income_processed += txn.get("amount", 0)
+        else:
+            total_expense_processed += txn.get("amount", 0)
+    
+    # Get reconciliations verified by this officer
+    reconciliations = await db.daily_reconciliations.find(
+        {"verified_by": finance_officer},
+        {"_id": 0}
+    ).to_list(1000)
+    
+    return {
+        "finance_officer": finance_officer,
+        "period": {"start": start_date, "end": end_date},
+        "transactions_processed": len(transactions),
+        "total_income_processed": total_income_processed,
+        "total_expense_processed": total_expense_processed,
+        "reconciliations_verified": len(reconciliations),
+        "detailed_transactions": transactions
+    }
+
+
+@api_router.get("/finance/reports/audit-trail")
+async def get_audit_trail(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    entity_type: Optional[str] = None,
+    limit: int = 200
+):
+    """Complete financial audit trail"""
+    query = {}
+    
+    if entity_type:
+        query["entity_type"] = {"$in": ["finance_transaction", "expense_record", "daily_reconciliation", entity_type]}
+    
+    if start_date and end_date:
+        try:
+            start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+            end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+            query["timestamp"] = {"$gte": start_dt.isoformat(), "$lte": end_dt.isoformat()}
+        except ValueError:
+            pass
+    
+    audit_logs = await db.audit_logs.find(
+        query, {"_id": 0}
+    ).sort("timestamp", -1).limit(limit).to_list(limit)
+    
+    return audit_logs
 
 
 @api_router.get("/recent-activity")

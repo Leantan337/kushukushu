@@ -33,11 +33,12 @@ const PaymentProcessing = () => {
   const location = useLocation();
   const { toast } = useToast();
   
-  // Use context instead of mock data
-  const { purchaseRequisitions, processPurchasePayment, formatCurrency, currentUser } = useAppContext();
+  const { formatCurrency, currentUser } = useAppContext();
   
   const [selectedRequisition, setSelectedRequisition] = useState(null);
   const [processing, setProcessing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [approvedRequisitions, setApprovedRequisitions] = useState([]);
   
   const [paymentDetails, setPaymentDetails] = useState({
     paymentMethod: '',
@@ -48,8 +49,11 @@ const PaymentProcessing = () => {
     attachments: []
   });
 
-  // Filter only owner-approved requisitions
-  const approvedRequisitions = purchaseRequisitions.filter(pr => pr.status === 'owner_approved');
+  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
+
+  useEffect(() => {
+    loadPendingAuthorizations();
+  }, []);
 
   useEffect(() => {
     // Check if a specific approval was passed from dashboard
@@ -57,6 +61,26 @@ const PaymentProcessing = () => {
       setSelectedRequisition(location.state.approval);
     }
   }, [location]);
+
+  const loadPendingAuthorizations = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/finance/pending-authorizations`);
+      if (response.ok) {
+        const data = await response.json();
+        setApprovedRequisitions(data);
+      }
+    } catch (error) {
+      console.error('Error loading pending authorizations:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load pending authorizations',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleProcessPayment = async () => {
     if (!selectedRequisition) {
@@ -80,34 +104,58 @@ const PaymentProcessing = () => {
     setProcessing(true);
 
     try {
-      // Process payment using context (updates global state)
-      processPurchasePayment(
-        selectedRequisition.id,
-        paymentDetails,
-        currentUser?.username || 'Finance Officer'
-      );
-
-      toast({
-        title: '✅ Payment Processed Successfully',
-        description: `Payment of ${formatCurrency(selectedRequisition.estimated_cost)} processed. Purchase requisition status updated to PURCHASED.`,
-        variant: 'default'
+      const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
+      
+      // Process payment via finance API
+      const response = await fetch(`${BACKEND_URL}/api/finance/process-payment/${selectedRequisition.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: selectedRequisition.estimated_cost,
+          payment_method: paymentDetails.paymentMethod,
+          bank_account: paymentDetails.bankAccount,
+          reference_number: paymentDetails.referenceNumber,
+          payment_date: paymentDetails.paymentDate,
+          processed_by: currentUser?.username || 'Finance Officer',
+          notes: paymentDetails.notes
+        })
       });
 
-      // Reset form
-      setSelectedRequisition(null);
-      setPaymentDetails({
-        paymentMethod: '',
-        bankAccount: '',
-        referenceNumber: '',
-        paymentDate: new Date().toISOString().split('T')[0],
-        notes: '',
-        attachments: []
-      });
+      if (response.ok) {
+        const data = await response.json();
+        
+        toast({
+          title: '✅ Payment Processed Successfully',
+          description: `Payment of ${formatCurrency(selectedRequisition.estimated_cost)} processed. Purchase requisition status updated to PURCHASED.`,
+          variant: 'default'
+        });
 
-      // Navigate back to dashboard
-      setTimeout(() => {
-        navigate('/finance/dashboard');
-      }, 1500);
+        // Reset form
+        setSelectedRequisition(null);
+        setPaymentDetails({
+          paymentMethod: '',
+          bankAccount: '',
+          referenceNumber: '',
+          paymentDate: new Date().toISOString().split('T')[0],
+          notes: '',
+          attachments: []
+        });
+
+        // Reload the list
+        await loadPendingAuthorizations();
+        
+        // Navigate back to dashboard
+        setTimeout(() => {
+          navigate('/finance/dashboard');
+        }, 1500);
+      } else {
+        const error = await response.json();
+        toast({
+          title: 'Payment Failed',
+          description: error.detail || 'Failed to process payment',
+          variant: 'destructive'
+        });
+      }
 
     } catch (error) {
       console.error('Error processing payment:', error);
@@ -121,6 +169,17 @@ const PaymentProcessing = () => {
     }
   };
 
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <CreditCard className="w-12 h-12 mx-auto mb-4 text-green-600 animate-pulse" />
+          <p className="text-slate-600">Loading pending payments...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">

@@ -15,6 +15,7 @@ import PurchaseRequisitions from "./components/requisitions/PurchaseRequisitions
 import InternalOrderRequisitions from "./components/requisitions/InternalOrderRequisitions";
 import ManagerDashboard from "./components/manager/ManagerDashboard";
 import SalesDashboard from "./components/sales/SalesDashboard";
+import EndOfDayReconciliation from "./components/sales/EndOfDayReconciliation";
 import StoreKeeperDashboard from "./components/storekeeper/StoreKeeperDashboard";
 import SimplePOS from "./components/demo/SimplePOS";
 import SimpleInventoryDashboard from "./components/demo/SimpleInventoryDashboard";
@@ -23,8 +24,10 @@ import DemoFinanceDashboard from "./components/demo/FinanceDashboard";
 import DemoLanding from "./components/demo/DemoLanding";
 import FinanceDashboard from "./components/finance/FinanceDashboard";
 import PaymentProcessing from "./components/finance/PaymentProcessing";
-import DailyReconciliation from "./components/finance/DailyReconciliation";
+import DailyReconciliation from "./components/finance/DailyReconciliationNew";
 import AccountsReceivable from "./components/finance/AccountsReceivable";
+import IncomeRecording from "./components/finance/IncomeRecording";
+import ExpenseRecording from "./components/finance/ExpenseRecording";
 import { Toaster } from "./components/ui/toaster";
 import { AppProvider } from "./context/AppContext";
 
@@ -68,6 +71,7 @@ function App() {
           
           {/* Sales Routes */}
           <Route path="/sales/dashboard" element={<SalesDashboard />} />
+          <Route path="/sales/end-of-day-reconciliation" element={<EndOfDayReconciliation />} />
           
           {/* Store Keeper Routes */}
           <Route path="/storekeeper/dashboard" element={<StoreKeeperDashboard />} />
@@ -84,6 +88,8 @@ function App() {
           <Route path="/finance/payment-processing" element={<PaymentProcessing />} />
           <Route path="/finance/reconciliation" element={<DailyReconciliation />} />
           <Route path="/finance/receivables" element={<AccountsReceivable />} />
+          <Route path="/finance/income-recording" element={<IncomeRecording />} />
+          <Route path="/finance/expense-recording" element={<ExpenseRecording />} />
         </Routes>
       </BrowserRouter>
       <Toaster />

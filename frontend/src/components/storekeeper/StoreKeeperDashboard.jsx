@@ -4,7 +4,7 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import InventoryManagement from '../inventory/InventoryManagement';
-import InternalOrderRequisitions from '../requisitions/InternalOrderRequisitions';
+import StoreKeeperFulfillment from './StoreKeeperFulfillment';
 
 const StoreKeeperDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -211,7 +211,7 @@ const StoreKeeperDashboard = () => {
         return <InventoryManagement userRole="store_keeper" userBranch={userBranch} />;
 
       case 'fulfillment':
-        return <InternalOrderRequisitions userRole="store_keeper" userBranch={userBranch} />;
+        return <StoreKeeperFulfillment />;
 
       default:
         return <div>Tab content not found</div>;
