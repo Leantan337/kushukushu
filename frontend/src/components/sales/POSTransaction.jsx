@@ -37,11 +37,12 @@ const POSTransaction = () => {
       const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
-        // Filter sellable products only (exclude service items and raw wheat)
+        // Filter sellable products only (exclude service items, raw materials, and items with no price)
         const sellableProducts = data.filter(item => 
           item.is_sellable !== false &&
           item.category !== "service" &&
-          item.name !== "Raw Wheat"
+          item.name !== "Raw Wheat" &&
+          (item.unit_price > 0 || item.unit_selling_price > 0)
         );
         setProducts(sellableProducts);
       }

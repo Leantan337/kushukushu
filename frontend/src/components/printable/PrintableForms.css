@@ -1,0 +1,507 @@
+/* Printable Forms Stylesheet */
+
+.printable-form {
+  max-width: 210mm; /* A4 width */
+  margin: 20px auto;
+  padding: 20mm;
+  background: white;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+  font-family: 'Arial', 'Helvetica', sans-serif;
+  font-size: 11pt;
+  line-height: 1.4;
+  color: #000;
+}
+
+/* Header Styling */
+.form-header {
+  display: grid;
+  grid-template-columns: 80px 1fr 150px;
+  gap: 15px;
+  align-items: center;
+  padding-bottom: 15px;
+  border-bottom: 3px solid #000;
+  margin-bottom: 20px;
+}
+
+.company-logo .logo-placeholder {
+  width: 80px;
+  height: 80px;
+  border: 2px solid #333;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8pt;
+  font-weight: bold;
+  color: #666;
+  background: #f5f5f5;
+}
+
+.form-title {
+  text-align: center;
+}
+
+.form-title h1 {
+  margin: 0;
+  font-size: 24pt;
+  font-weight: bold;
+  letter-spacing: 1px;
+  color: #000;
+}
+
+.form-subtitle {
+  margin: 5px 0 0 0;
+  font-size: 10pt;
+  color: #555;
+  font-style: italic;
+}
+
+.form-number {
+  text-align: right;
+}
+
+.number-box {
+  border: 2px solid #000;
+  padding: 8px 12px;
+  margin-top: 5px;
+  font-size: 14pt;
+  font-weight: bold;
+  text-align: center;
+  background: #f9f9f9;
+}
+
+.gate-pass-number {
+  background: #ffe6e6;
+  border-color: #c00;
+}
+
+/* Gate Pass Validity Banner */
+.gate-pass-validity {
+  background: #ffeb3b;
+  border: 2px solid #f57c00;
+  padding: 10px;
+  text-align: center;
+  margin: -10px 0 20px 0;
+  font-size: 12pt;
+  color: #000;
+}
+
+/* Form Sections */
+.form-section {
+  margin-bottom: 20px;
+}
+
+.section-title {
+  font-size: 12pt;
+  font-weight: bold;
+  margin: 0 0 10px 0;
+  padding: 5px 10px;
+  background: #333;
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Info Grid */
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px 20px;
+  padding: 10px 0;
+}
+
+.info-item {
+  display: flex;
+  border-bottom: 1px solid #ddd;
+  padding: 5px 0;
+}
+
+.info-item.full-width {
+  grid-column: 1 / -1;
+}
+
+.info-item .label {
+  font-weight: bold;
+  min-width: 150px;
+  color: #333;
+}
+
+.info-item .value {
+  flex: 1;
+  color: #000;
+}
+
+.priority-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #ffa726;
+  color: white;
+  border-radius: 3px;
+  font-size: 9pt;
+  font-weight: bold;
+}
+
+.type-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 3px;
+  font-size: 10pt;
+  font-weight: bold;
+}
+
+.type-badge.outward {
+  background: #ef5350;
+  color: white;
+}
+
+.type-badge.inward {
+  background: #66bb6a;
+  color: white;
+}
+
+/* Tables */
+.form-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10pt;
+  margin: 10px 0;
+}
+
+.form-table thead {
+  background: #f5f5f5;
+}
+
+.form-table th {
+  border: 1px solid #000;
+  padding: 8px 6px;
+  font-weight: bold;
+  text-align: left;
+  font-size: 9pt;
+  text-transform: uppercase;
+}
+
+.form-table td {
+  border: 1px solid #666;
+  padding: 6px;
+  vertical-align: top;
+}
+
+.form-table tbody tr:nth-child(odd):not(.empty-row) {
+  background: #fafafa;
+}
+
+.form-table .empty-row {
+  height: 30px;
+  background: white;
+}
+
+.form-table .text-right {
+  text-align: right;
+}
+
+.form-table .text-center {
+  text-align: center;
+}
+
+.form-table .small-text {
+  font-size: 9pt;
+  color: #555;
+}
+
+.form-table code {
+  font-family: 'Courier New', monospace;
+  background: #f0f0f0;
+  padding: 2px 4px;
+  border-radius: 2px;
+  font-size: 9pt;
+}
+
+.form-table tfoot .total-row {
+  background: #e0e0e0;
+  font-weight: bold;
+  border-top: 2px solid #000;
+}
+
+/* Info Box */
+.info-box {
+  border: 2px solid #333;
+  padding: 15px;
+  background: #f9f9f9;
+  border-radius: 5px;
+}
+
+.info-box h4 {
+  margin: 0 0 10px 0;
+  font-size: 11pt;
+}
+
+.info-box ul {
+  margin: 5px 0;
+  padding-left: 20px;
+}
+
+.info-box li {
+  margin: 3px 0;
+  font-size: 10pt;
+}
+
+/* Notes Box */
+.notes-box {
+  border: 1px solid #999;
+  padding: 10px;
+  min-height: 60px;
+  background: #fafafa;
+  white-space: pre-wrap;
+}
+
+/* Signature Grid */
+.signature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+  margin-top: 30px;
+}
+
+.signature-grid-4 {
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.signature-box {
+  text-align: center;
+}
+
+.signature-line {
+  border-top: 2px solid #000;
+  margin-bottom: 8px;
+  height: 50px;
+}
+
+.signature-label {
+  font-weight: bold;
+  margin-bottom: 10px;
+  font-size: 10pt;
+  text-transform: uppercase;
+}
+
+.signature-details {
+  text-align: left;
+  font-size: 9pt;
+  color: #333;
+}
+
+.signature-details p {
+  margin: 3px 0;
+  border-bottom: 1px dotted #999;
+  padding: 2px 0;
+}
+
+/* Gate Pass Instructions */
+.gate-pass-instructions {
+  background: #fff3cd;
+  border: 2px solid #ff9800;
+  padding: 15px;
+  margin: 20px 0;
+}
+
+.gate-pass-instructions h4 {
+  margin: 0 0 10px 0;
+  color: #e65100;
+  font-size: 11pt;
+}
+
+.instructions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 15px;
+}
+
+.instructions-grid strong {
+  display: block;
+  margin-bottom: 5px;
+  color: #000;
+}
+
+.instructions-grid ul {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 9pt;
+}
+
+.instructions-grid li {
+  margin: 2px 0;
+}
+
+/* Footer */
+.form-footer {
+  margin-top: 30px;
+  padding-top: 15px;
+  border-top: 2px solid #000;
+}
+
+.footer-stamps {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  margin-bottom: 15px;
+}
+
+.stamp-box {
+  border: 2px dashed #666;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fafafa;
+}
+
+.stamp-label {
+  font-size: 9pt;
+  color: #666;
+  font-weight: bold;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.footer-text {
+  text-align: center;
+  font-size: 9pt;
+  color: #555;
+  margin: 5px 0;
+}
+
+.footer-text.small {
+  font-size: 8pt;
+  color: #999;
+}
+
+/* Print Styles */
+@media print {
+  .printable-form {
+    box-shadow: none;
+    margin: 0;
+    padding: 15mm;
+    max-width: 100%;
+  }
+
+  .form-section {
+    page-break-inside: avoid;
+  }
+
+  .signature-grid {
+    page-break-inside: avoid;
+  }
+
+  /* Hide certain elements in print if needed */
+  button, .no-print {
+    display: none !important;
+  }
+
+  /* Ensure black prints properly */
+  .form-header {
+    border-bottom-color: #000 !important;
+  }
+
+  .section-title {
+    background: #333 !important;
+    color: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .form-table th,
+  .form-table td {
+    border-color: #000 !important;
+  }
+
+  /* Ensure gate pass elements print correctly */
+  .gate-pass-validity {
+    background: #ffeb3b !important;
+    border-color: #f57c00 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .type-badge.outward,
+  .type-badge.inward,
+  .priority-badge {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+/* Preview Container (for showing all forms) */
+.forms-preview-container {
+  padding: 20px;
+  background: #e0e0e0;
+  min-height: 100vh;
+}
+
+.preview-header {
+  max-width: 210mm;
+  margin: 0 auto 20px;
+  padding: 20px;
+  background: white;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  border-radius: 5px;
+}
+
+.preview-header h1 {
+  margin: 0 0 10px 0;
+  font-size: 24pt;
+  color: #333;
+}
+
+.preview-header p {
+  margin: 5px 0;
+  color: #666;
+}
+
+.preview-controls {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.preview-controls button {
+  padding: 10px 20px;
+  font-size: 12pt;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  background: #2196f3;
+  color: white;
+  font-weight: bold;
+  transition: background 0.3s;
+}
+
+.preview-controls button:hover {
+  background: #1976d2;
+}
+
+.preview-controls button.secondary {
+  background: #757575;
+}
+
+.preview-controls button.secondary:hover {
+  background: #616161;
+}
+
+.form-divider {
+  max-width: 210mm;
+  margin: 40px auto;
+  text-align: center;
+  color: #999;
+  font-size: 10pt;
+}
+
+.form-divider::before,
+.form-divider::after {
+  content: '';
+  display: inline-block;
+  width: 40%;
+  height: 2px;
+  background: #ccc;
+  vertical-align: middle;
+  margin: 0 10px;
+}
+

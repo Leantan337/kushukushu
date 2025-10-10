@@ -1104,6 +1104,87 @@ async def get_inventory(branch_id: Optional[str] = None):
         deserialize_datetime(item)
     return items
 
+# ==================== INVENTORY VALUATION ENDPOINTS ====================
+
+@api_router.get("/inventory/valuation")
+async def get_inventory_valuation(branch_id: Optional[str] = None):
+    """Get total inventory value by branch"""
+    
+    query = {}
+    if branch_id:
+        query["branch_id"] = branch_id
+    
+    items = await db.inventory.find(query, {"_id": 0}).to_list(10000)
+    
+    branch_valuations = {}
+    total_inventory_value = 0.0
+    total_selling_value = 0.0
+    
+    for item in items:
+        branch = item.get("branch_id", "unknown")
+        quantity = item.get("quantity", 0)
+        unit_cost = item.get("current_unit_cost") or item.get("actual_unit_cost") or 0
+        unit_price = item.get("unit_selling_price") or item.get("unit_price") or 0
+        
+        inventory_value = quantity * unit_cost
+        selling_value = quantity * unit_price
+        
+        if branch not in branch_valuations:
+            branch_valuations[branch] = {
+                "inventory_value": 0.0,
+                "selling_value": 0.0,
+                "potential_profit": 0.0,
+                "item_count": 0
+            }
+        
+        branch_valuations[branch]["inventory_value"] += inventory_value
+        branch_valuations[branch]["selling_value"] += selling_value
+        branch_valuations[branch]["potential_profit"] += (selling_value - inventory_value)
+        branch_valuations[branch]["item_count"] += 1
+        
+        total_inventory_value += inventory_value
+        total_selling_value += selling_value
+    
+    return {
+        "by_branch": branch_valuations,
+        "total_inventory_value": total_inventory_value,
+        "total_selling_value": total_selling_value,
+        "total_potential_profit": total_selling_value - total_inventory_value,
+        "profit_margin_percent": ((total_selling_value - total_inventory_value) / total_inventory_value * 100) if total_inventory_value > 0 else 0
+    }
+
+
+@api_router.get("/inventory/valuation/summary")
+async def get_inventory_valuation_summary():
+    """Overall inventory worth summary"""
+    
+    items = await db.inventory.find({}, {"_id": 0}).to_list(10000)
+    
+    by_category = {}
+    total_value = 0.0
+    
+    for item in items:
+        category = item.get("category", "uncategorized")
+        quantity = item.get("quantity", 0)
+        unit_cost = item.get("current_unit_cost") or item.get("actual_unit_cost") or 0
+        
+        value = quantity * unit_cost
+        
+        if category not in by_category:
+            by_category[category] = {"value": 0.0, "items": 0}
+        
+        by_category[category]["value"] += value
+        by_category[category]["items"] += 1
+        total_value += value
+    
+    return {
+        "total_inventory_value": total_value,
+        "by_category": by_category,
+        "item_count": len(items)
+    }
+
+# ==================== END INVENTORY VALUATION ====================
+
 @api_router.get("/inventory/{item_id}", response_model=InventoryItem)
 async def get_inventory_item(item_id: str):
     """Get a specific inventory item with transaction history"""
@@ -2765,13 +2846,10 @@ async def create_purchase_request_sales(requisition: PurchaseRequisitionCreate):
     request_count = await db.purchase_requisitions.count_documents({})
     request_number = f"PR-{request_count + 1:06d}"
     
-    # Create purchase requisition
+    # Create purchase requisition with all fields from the request
     purchase_req = PurchaseRequisition(
+        **requisition.model_dump(),
         request_number=request_number,
-        description=requisition.description,
-        estimated_cost=requisition.estimated_cost,
-        reason=requisition.reason,
-        requested_by=requisition.requested_by,
         status=PurchaseRequisitionStatus.PENDING
     )
     
@@ -2790,7 +2868,10 @@ async def create_purchase_request_sales(requisition: PurchaseRequisitionCreate):
             "request_number": request_number,
             "description": requisition.description,
             "estimated_cost": requisition.estimated_cost,
-            "reason": requisition.reason
+            "reason": requisition.reason,
+            "purchase_type": requisition.purchase_type,
+            "category": requisition.category,
+            "branch_id": requisition.branch_id
         }
     )
     
@@ -4428,86 +4509,6 @@ async def get_spending_limits(finance_officer: str):
             "owner_approval": settings.get("owner_approval_threshold"),
             "multi_signature": settings.get("multi_signature_threshold")
         }
-    }
-
-
-# ==================== INVENTORY VALUATION ENDPOINTS ====================
-
-@api_router.get("/inventory/valuation")
-async def get_inventory_valuation(branch_id: Optional[str] = None):
-    """Get total inventory value by branch"""
-    
-    query = {}
-    if branch_id:
-        query["branch_id"] = branch_id
-    
-    items = await db.inventory.find(query, {"_id": 0}).to_list(10000)
-    
-    branch_valuations = {}
-    total_inventory_value = 0.0
-    total_selling_value = 0.0
-    
-    for item in items:
-        branch = item.get("branch_id", "unknown")
-        quantity = item.get("quantity", 0)
-        unit_cost = item.get("current_unit_cost") or item.get("actual_unit_cost") or 0
-        unit_price = item.get("unit_selling_price") or item.get("unit_price") or 0
-        
-        inventory_value = quantity * unit_cost
-        selling_value = quantity * unit_price
-        
-        if branch not in branch_valuations:
-            branch_valuations[branch] = {
-                "inventory_value": 0.0,
-                "selling_value": 0.0,
-                "potential_profit": 0.0,
-                "item_count": 0
-            }
-        
-        branch_valuations[branch]["inventory_value"] += inventory_value
-        branch_valuations[branch]["selling_value"] += selling_value
-        branch_valuations[branch]["potential_profit"] += (selling_value - inventory_value)
-        branch_valuations[branch]["item_count"] += 1
-        
-        total_inventory_value += inventory_value
-        total_selling_value += selling_value
-    
-    return {
-        "by_branch": branch_valuations,
-        "total_inventory_value": total_inventory_value,
-        "total_selling_value": total_selling_value,
-        "total_potential_profit": total_selling_value - total_inventory_value,
-        "profit_margin_percent": ((total_selling_value - total_inventory_value) / total_inventory_value * 100) if total_inventory_value > 0 else 0
-    }
-
-
-@api_router.get("/inventory/valuation/summary")
-async def get_inventory_valuation_summary():
-    """Overall inventory worth summary"""
-    
-    items = await db.inventory.find({}, {"_id": 0}).to_list(10000)
-    
-    by_category = {}
-    total_value = 0.0
-    
-    for item in items:
-        category = item.get("category", "uncategorized")
-        quantity = item.get("quantity", 0)
-        unit_cost = item.get("current_unit_cost") or item.get("actual_unit_cost") or 0
-        
-        value = quantity * unit_cost
-        
-        if category not in by_category:
-            by_category[category] = {"value": 0.0, "items": 0}
-        
-        by_category[category]["value"] += value
-        by_category[category]["items"] += 1
-        total_value += value
-    
-    return {
-        "total_inventory_value": total_value,
-        "by_category": by_category,
-        "item_count": len(items)
     }
 
 

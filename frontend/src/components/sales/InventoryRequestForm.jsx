@@ -40,12 +40,13 @@ const InventoryRequestForm = () => {
       const response = await fetch(`${BACKEND_URL}/api/inventory?branch_id=${formData.branch_id}`);
       if (response.ok) {
         const data = await response.json();
-        // Get unique products (excluding service items and raw wheat)
+        // Get unique products (excluding service items, raw materials, and items with no price)
         const products = data
           .filter(item => 
             item.is_sellable !== false && 
             item.category !== "service" &&
-            item.name !== "Raw Wheat"
+            item.name !== "Raw Wheat" &&
+            (item.unit_price > 0 || item.unit_selling_price > 0)
           )
           .map(item => ({
             value: item.name,

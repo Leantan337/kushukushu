@@ -25,6 +25,7 @@ import SimpleInventoryDashboard from "./components/demo/SimpleInventoryDashboard
 import SimpleSalesDashboard from "./components/demo/SimpleSalesDashboard";
 import DemoFinanceDashboard from "./components/demo/FinanceDashboard";
 import DemoLanding from "./components/demo/DemoLanding";
+import PrintableFormsPreview from "./components/printable/PrintableFormsPreview";
 import FinanceDashboard from "./components/finance/FinanceDashboard";
 import PaymentProcessing from "./components/finance/PaymentProcessing";
 import DailyReconciliation from "./components/finance/DailyReconciliationNew";
@@ -88,6 +89,9 @@ function App() {
           <Route path="/demo/inventory" element={<SimpleInventoryDashboard />} />
           <Route path="/demo/sales" element={<SimpleSalesDashboard />} />
           <Route path="/demo/finance" element={<DemoFinanceDashboard />} />
+          
+          {/* Printable Forms Preview */}
+          <Route path="/printable-forms" element={<PrintableFormsPreview />} />
           
           {/* Finance Routes */}
           <Route path="/finance/dashboard" element={<FinanceDashboard />} />

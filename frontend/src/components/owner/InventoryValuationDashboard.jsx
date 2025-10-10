@@ -1,12 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Badge } from '../ui/badge';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
 import { 
   Package,
   TrendingUp,
   DollarSign,
   Building2,
-  Layers
+  Layers,
+  Edit,
+  AlertCircle
 } from 'lucide-react';
 
 const InventoryValuationDashboard = () => {
@@ -23,6 +28,15 @@ const InventoryValuationDashboard = () => {
     by_category: {},
     item_count: 0
   });
+  const [products, setProducts] = useState([]);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [editPricing, setEditPricing] = useState({
+    actual_unit_cost: '',
+    current_unit_cost: '',
+    unit_selling_price: ''
+  });
+  const [saving, setSaving] = useState(false);
 
   const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 
@@ -33,13 +47,15 @@ const InventoryValuationDashboard = () => {
   const loadValuation = async () => {
     setLoading(true);
     try {
-      const [branchData, catData] = await Promise.all([
+      const [branchData, catData, productsData] = await Promise.all([
         fetch(`${BACKEND_URL}/api/inventory/valuation`).then(r => r.ok ? r.json() : {}),
-        fetch(`${BACKEND_URL}/api/inventory/valuation/summary`).then(r => r.ok ? r.json() : {})
+        fetch(`${BACKEND_URL}/api/inventory/valuation/summary`).then(r => r.ok ? r.json() : {}),
+        fetch(`${BACKEND_URL}/api/inventory`).then(r => r.ok ? r.json() : [])
       ]);
 
       setValuation(branchData);
       setCategoryData(catData);
+      setProducts(productsData);
     } catch (error) {
       console.error('Error loading valuation:', error);
     } finally {
@@ -48,6 +64,72 @@ const InventoryValuationDashboard = () => {
   };
 
   const formatCurrency = (amount) => `ETB ${amount?.toLocaleString() || '0'}`;
+
+  const handleEditClick = (product) => {
+    setSelectedProduct(product);
+    setEditPricing({
+      actual_unit_cost: product.actual_unit_cost || '',
+      current_unit_cost: product.current_unit_cost || product.actual_unit_cost || '',
+      unit_selling_price: product.unit_selling_price || product.unit_price || ''
+    });
+    setShowEditModal(true);
+  };
+
+  const handleSavePricing = async () => {
+    if (!selectedProduct) return;
+
+    // Validate inputs
+    const actualCost = parseFloat(editPricing.actual_unit_cost);
+    const currentCost = parseFloat(editPricing.current_unit_cost);
+    const sellingPrice = parseFloat(editPricing.unit_selling_price);
+
+    if (isNaN(actualCost) || actualCost < 0) {
+      alert('Please enter a valid actual cost');
+      return;
+    }
+    if (isNaN(currentCost) || currentCost < 0) {
+      alert('Please enter a valid current cost');
+      return;
+    }
+    if (isNaN(sellingPrice) || sellingPrice < 0) {
+      alert('Please enter a valid selling price');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/inventory/${selectedProduct.id}/pricing`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          actual_unit_cost: actualCost,
+          current_unit_cost: currentCost,
+          unit_selling_price: sellingPrice
+        })
+      });
+
+      if (response.ok) {
+        // Reload all data
+        await loadValuation();
+        setShowEditModal(false);
+        setSelectedProduct(null);
+        setEditPricing({
+          actual_unit_cost: '',
+          current_unit_cost: '',
+          unit_selling_price: ''
+        });
+      } else {
+        alert('Failed to update pricing. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error updating pricing:', error);
+      alert('Error updating pricing. Please check your connection and try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -172,7 +254,187 @@ const InventoryValuationDashboard = () => {
           </div>
         </div>
 
+        {/* Product List with Pricing */}
+        <div>
+          <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+            <Package className="w-5 h-5" />
+            All Products - Pricing Details
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-100 border-b-2 border-slate-300">
+                <tr>
+                  <th className="text-left p-3 font-semibold text-slate-700">Product Name</th>
+                  <th className="text-left p-3 font-semibold text-slate-700">Branch</th>
+                  <th className="text-left p-3 font-semibold text-slate-700">Category</th>
+                  <th className="text-right p-3 font-semibold text-slate-700">Quantity</th>
+                  <th className="text-right p-3 font-semibold text-slate-700">Current Cost</th>
+                  <th className="text-right p-3 font-semibold text-slate-700">Selling Price</th>
+                  <th className="text-right p-3 font-semibold text-slate-700">Total Value</th>
+                  <th className="text-center p-3 font-semibold text-slate-700">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {products.length === 0 ? (
+                  <tr>
+                    <td colSpan="8" className="text-center p-6 text-slate-500">
+                      No products found
+                    </td>
+                  </tr>
+                ) : (
+                  products.map((product) => {
+                    const currentCost = product.current_unit_cost || product.actual_unit_cost || 0;
+                    const sellingPrice = product.unit_selling_price || product.unit_price || 0;
+                    const totalValue = product.quantity * currentCost;
+                    
+                    return (
+                      <tr key={product.id} className="border-b border-slate-200 hover:bg-slate-50">
+                        <td className="p-3 font-medium text-slate-900">{product.name}</td>
+                        <td className="p-3">
+                          <Badge variant="outline" className="capitalize">
+                            {product.branch_id || 'N/A'}
+                          </Badge>
+                        </td>
+                        <td className="p-3 capitalize text-slate-600">{product.category || 'N/A'}</td>
+                        <td className="p-3 text-right text-slate-900">
+                          {product.quantity?.toLocaleString() || 0} {product.unit || 'kg'}
+                        </td>
+                        <td className="p-3 text-right font-medium text-blue-600">
+                          {formatCurrency(currentCost)}
+                        </td>
+                        <td className="p-3 text-right font-medium text-purple-600">
+                          {formatCurrency(sellingPrice)}
+                        </td>
+                        <td className="p-3 text-right font-bold text-green-600">
+                          {formatCurrency(totalValue)}
+                        </td>
+                        <td className="p-3 text-center">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleEditClick(product)}
+                            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          >
+                            <Edit className="w-4 h-4 mr-1" />
+                            Edit
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </CardContent>
+
+      {/* Edit Pricing Modal */}
+      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Product Pricing</DialogTitle>
+          </DialogHeader>
+          {selectedProduct && (
+            <div className="space-y-4 py-4">
+              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="font-semibold text-slate-900">{selectedProduct.name}</p>
+                <p className="text-sm text-slate-600">
+                  Branch: <span className="capitalize">{selectedProduct.branch_id || 'N/A'}</span> | 
+                  Quantity: {selectedProduct.quantity?.toLocaleString() || 0} {selectedProduct.unit || 'kg'}
+                </p>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-slate-700 mb-2 block">
+                  Actual Unit Cost (ETB) *
+                </label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="Enter actual cost per unit"
+                  value={editPricing.actual_unit_cost}
+                  onChange={(e) => setEditPricing({...editPricing, actual_unit_cost: e.target.value})}
+                  className="w-full"
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  The actual cost paid when purchasing this item
+                </p>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-slate-700 mb-2 block">
+                  Current Unit Cost (ETB) *
+                </label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="Enter current cost per unit"
+                  value={editPricing.current_unit_cost}
+                  onChange={(e) => setEditPricing({...editPricing, current_unit_cost: e.target.value})}
+                  className="w-full"
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  Current cost for valuation purposes
+                </p>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-slate-700 mb-2 block">
+                  Selling Price (ETB) *
+                </label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="Enter selling price per unit"
+                  value={editPricing.unit_selling_price}
+                  onChange={(e) => setEditPricing({...editPricing, unit_selling_price: e.target.value})}
+                  className="w-full"
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  Price at which this item is sold to customers
+                </p>
+              </div>
+
+              <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5" />
+                  <p className="text-xs text-amber-800">
+                    <strong>Note:</strong> Updating pricing will recalculate all valuation metrics immediately.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowEditModal(false);
+                setSelectedProduct(null);
+                setEditPricing({
+                  actual_unit_cost: '',
+                  current_unit_cost: '',
+                  unit_selling_price: ''
+                });
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSavePricing}
+              disabled={saving}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {saving ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };
