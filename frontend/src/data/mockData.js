@@ -179,7 +179,7 @@ export const mockData = {
       { month: "Dec 2024", production: 185000, efficiency: 90 }
     ],
     profitLoss: [
-      { month: "Jul 2024", revenue: 52000000, costs: 38000000, profit: 14000000 },
+      { month: "Jul 2024", revenue: 52000000, costs: 3000, profit: 14000000 },
       { month: "Aug 2024", revenue: 48000000, costs: 36000000, profit: 12000000 },
       { month: "Sep 2024", revenue: 55000000, costs: 40000000, profit: 15000000 },
       { month: "Oct 2024", revenue: 59000000, costs: 42000000, profit: 17000000 },
@@ -192,6 +192,61 @@ export const mockData = {
       { customer: "Tigray Wholesale", amount: 680000, daysOverdue: 22 },
       { customer: "Adigrat Retailers", amount: 510000, daysOverdue: 5 }
     ]
+  },
+
+  // Mock data for finance module
+  finance: {
+    kpis: {
+      cashBalance: 45230000,
+      pendingPayments: 8500000,
+      accountsReceivable: 3240000,
+      todaysSales: 2350000,
+      cashFlow: 1180000,
+      monthlyRevenue: 58000000
+    },
+    pendingPayments: [
+      {
+        id: 'PR-00001',
+        description: 'Premium Wheat - 500 tons',
+        amount: 8500000,
+        requestedBy: 'Manager - Berhane',
+        status: 'owner_approved',
+        priority: 'High'
+      },
+      {
+        id: 'PR-00002',
+        description: 'Equipment Maintenance',
+        amount: 3800000,
+        requestedBy: 'Admin Team',
+        status: 'owner_approved',
+        priority: 'Medium'
+      }
+    ],
+    dailyReconciliation: {
+      berhane: {
+        totalSales: 1240000,
+        cashSales: 890000,
+        creditSales: 350000,
+        transactionCount: 8
+      },
+      girmay: {
+        totalSales: 1110000,
+        cashSales: 920000,
+        creditSales: 190000,
+        transactionCount: 8
+      }
+    },
+    receivables: {
+      totalOutstanding: 3240000,
+      totalCustomers: 12,
+      overdueAmount: 1530000,
+      overdueCustomers: 4,
+      topDebtors: [
+        { name: 'Habesha Bakery', amount: 850000, daysOverdue: 15 },
+        { name: 'Mekelle Distribution', amount: 1200000, daysOverdue: 12 },
+        { name: 'Tigray Wholesale', amount: 680000, daysOverdue: 23 }
+      ]
+    }
   },
 
   // Mock data for user management

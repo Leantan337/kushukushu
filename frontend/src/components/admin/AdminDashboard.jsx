@@ -21,7 +21,8 @@ import {
   Activity,
   ShoppingCart,
   Boxes,
-  Wallet
+  Wallet,
+  LogOut
 } from "lucide-react";
 import { mockData } from "../../data/mockData";
 
@@ -254,6 +255,19 @@ const AdminDashboard = () => {
                 <Badge className="absolute -top-2 -right-2 w-5 h-5 p-0 flex items-center justify-center bg-red-500 text-white text-xs">
                   3
                 </Badge>
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={() => {
+                  localStorage.clear();
+                  sessionStorage.clear();
+                  navigate("/");
+                }}
+                className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-300"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Logout
               </Button>
             </div>
           </div>
