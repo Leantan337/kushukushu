@@ -26,7 +26,8 @@ const ApprovalsScreen = () => {
     setLoading(true);
     try {
       // Fetch purchase requisitions that need owner approval
-      const response = await fetch(`${BACKEND_URL}/api/purchase-requisitions?status=admin_approved`);
+      // Owner sees requests with status 'pending_owner_approval' (amounts above admin threshold)
+      const response = await fetch(`${BACKEND_URL}/api/purchase-requisitions?status=pending_owner_approval`);
       if (response.ok) {
         const data = await response.json();
         
@@ -90,8 +91,8 @@ const ApprovalsScreen = () => {
 
   const handleApprove = async (id) => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/purchase-requisitions/${id}/owner-approve`, {
-        method: 'POST',
+      const response = await fetch(`${BACKEND_URL}/api/purchase-requisitions/${id}/approve-owner`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ approved_by: 'Owner' })
       });
@@ -125,7 +126,7 @@ const ApprovalsScreen = () => {
   const handleReject = async (id) => {
     try {
       const response = await fetch(`${BACKEND_URL}/api/purchase-requisitions/${id}/reject`, {
-        method: 'POST',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rejected_by: 'Owner', rejection_reason: 'Rejected by Owner' })
       });

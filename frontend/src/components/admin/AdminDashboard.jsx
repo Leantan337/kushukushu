@@ -361,7 +361,13 @@ const AdminDashboard = () => {
                     onClick={() => navigate("/admin/users")}
                   />
                   <QuickNavCard
-                    title="Review Approvals"
+                    title="Purchase Approvals"
+                    icon={ShoppingCart}
+                    color="bg-blue-600"
+                    onClick={() => navigate("/admin/purchase-approvals")}
+                  />
+                  <QuickNavCard
+                    title="Review Other Approvals"
                     icon={CheckCircle}
                     color="bg-green-600"
                     onClick={() => navigate("/approvals")}

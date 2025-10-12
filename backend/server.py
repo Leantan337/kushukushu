@@ -410,8 +410,11 @@ async def get_finance_summary():
     # Get all loans
     loans = await db.loans.find({"status": "active"}, {"_id": 0}).to_list(1000)
     
-    # Get pending requisitions
-    requisitions = await db.purchase_requisitions.find({"status": "owner_approved"}, {"_id": 0}).to_list(1000)
+    # Get pending requisitions (both admin_approved and owner_approved)
+    requisitions = await db.purchase_requisitions.find(
+        {"status": {"$in": ["admin_approved", "owner_approved"]}}, 
+        {"_id": 0}
+    ).to_list(1000)
     
     total_sales = sum(txn.get('total_amount', 0) for txn in transactions)
     accounts_receivable = sum(loan.get('balance', 0) for loan in loans)
@@ -424,16 +427,24 @@ async def get_finance_summary():
         "total_expenses": pending_payments,
         "net_balance": total_sales - pending_payments,
         "accounts_receivable": accounts_receivable,
-        "pending_payments": pending_payments
+        "pending_payments": pending_payments,
+        "pending_count": len(requisitions)
     }
 
 @api_router.get("/finance/pending-authorizations")
 async def get_pending_authorizations():
-    """Get purchase requisitions awaiting payment"""
+    """Get purchase requisitions awaiting payment
+    
+    Returns both:
+    - admin_approved: Requests approved by Admin (≤ Br 50,000)
+    - owner_approved: Requests approved by Owner (> Br 50,000)
+    
+    Both need Finance to process payment!
+    """
     requisitions = await db.purchase_requisitions.find(
-        {"status": "owner_approved"},
+        {"status": {"$in": ["admin_approved", "owner_approved"]}},
         {"_id": 0}
-    ).to_list(100)
+    ).sort("requested_at", -1).to_list(100)
     return requisitions
 
 @api_router.get("/finance/transactions")
@@ -507,7 +518,12 @@ async def get_spending_limits(finance_officer: str = Query(...)):
 
 @api_router.post("/finance/process-payment/{requisition_id}")
 async def process_payment(requisition_id: str, payment_data: Dict[str, Any]):
-    """Process payment for approved requisition"""
+    """Process payment for approved requisition
+    
+    Accepts both:
+    - admin_approved: Requests approved by Admin (≤ Br 50,000)
+    - owner_approved: Requests approved by Owner (> Br 50,000)
+    """
     
     # Get requisition
     requisition = await db.purchase_requisitions.find_one({"id": requisition_id}, {"_id": 0})
@@ -515,8 +531,12 @@ async def process_payment(requisition_id: str, payment_data: Dict[str, Any]):
     if not requisition:
         raise HTTPException(status_code=404, detail="Requisition not found")
     
-    if requisition.get("status") != "owner_approved":
-        raise HTTPException(status_code=400, detail="Requisition not approved for payment")
+    # Check if requisition is approved (by Admin or Owner)
+    if requisition.get("status") not in ["admin_approved", "owner_approved"]:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Requisition not approved for payment. Current status: {requisition.get('status')}"
+        )
     
     # Create payment record
     payment = {
@@ -540,10 +560,21 @@ async def process_payment(requisition_id: str, payment_data: Dict[str, Any]):
     # Update requisition status
     await db.purchase_requisitions.update_one(
         {"id": requisition_id},
-        {"$set": {"status": "completed", "payment_id": payment["id"]}}
+        {"$set": {
+            "status": "completed", 
+            "payment_id": payment["id"],
+            "completed_at": datetime.now(timezone.utc).isoformat()
+        }}
     )
     
-    await log_activity("Finance", "payment", f"Processed payment for {requisition.get('description')}", branch=requisition.get("branch_id"))
+    # Log activity with approval source
+    approval_source = "Admin" if requisition.get('status') == 'admin_approved' else "Owner"
+    await log_activity(
+        "Finance", 
+        "payment", 
+        f"Processed payment for {requisition.get('description')} (Br {requisition.get('estimated_cost', 0):,.2f}) - {approval_source} approved", 
+        branch=requisition.get("branch_id")
+    )
     
     return {"success": True, "payment": response_data}
 
@@ -1431,7 +1462,29 @@ async def get_customer_deliveries(
 
 @api_router.post("/purchase-requests")
 async def create_purchase_request(request_data: Dict[str, Any]):
-    """Create a new purchase request"""
+    """Create a new purchase request
+    
+    Workflow:
+    1. Sales creates request with status 'pending_approval'
+    2. If amount <= admin_threshold: Admin approves → Finance pays
+    3. If amount > admin_threshold: Owner approves → Finance pays
+    
+    Manager is NOT in the approval chain for purchase requests!
+    """
+    
+    estimated_cost = request_data.get("estimated_cost", 0)
+    
+    # Get financial controls to determine initial routing
+    controls = await db.financial_controls.find_one({})
+    admin_threshold = controls.get("admin_purchase_approval_threshold", 50000) if controls else 50000
+    
+    # Determine initial status and routing based on amount
+    if estimated_cost <= admin_threshold:
+        initial_status = "pending_admin_approval"
+        routing = "admin"
+    else:
+        initial_status = "pending_owner_approval"
+        routing = "owner"
     
     purchase_request = {
         "id": str(uuid.uuid4()),
@@ -1440,54 +1493,86 @@ async def create_purchase_request(request_data: Dict[str, Any]):
         "item_name": request_data.get("item_name", request_data.get("description", "Unknown")),
         "quantity": request_data.get("quantity", 1),
         "unit": request_data.get("unit", "pcs"),
-        "estimated_cost": request_data.get("estimated_cost"),
+        "estimated_cost": estimated_cost,
         "supplier_name": request_data.get("supplier_name", request_data.get("vendor_name")),
         "requested_by": request_data.get("requested_by"),
         "requested_at": datetime.now(timezone.utc).isoformat(),
-        "status": "pending",
+        "status": initial_status,
+        "routing": routing,  # 'admin' or 'owner'
         "branch_id": request_data.get("branch_id"),
         "urgency": request_data.get("urgency", "normal"),
         "notes": request_data.get("reason", request_data.get("notes", "")),
         "purchase_type": request_data.get("purchase_type", "cash"),
         "category": request_data.get("category", "general"),
-        "vendor_contact": request_data.get("vendor_contact", "")
+        "vendor_contact": request_data.get("vendor_contact", ""),
+        "payment_source": request_data.get("payment_source", "finance"),  # 'sales_revenue' or 'finance'
+        "admin_threshold": admin_threshold
     }
     
     # Make a copy for response
     response_data = purchase_request.copy()
     
     await db.purchase_requisitions.insert_one(purchase_request)
-    await log_activity("Sales", "purchase_request", f"Created purchase request {purchase_request['request_number']}", branch=request_data.get("branch_id"))
+    await log_activity(
+        "Sales", 
+        "purchase_request", 
+        f"Created purchase request {purchase_request['request_number']} (Br {estimated_cost:,.2f}) - Routed to {routing.upper()}", 
+        branch=request_data.get("branch_id")
+    )
     
     return response_data
 
-@api_router.put("/purchase-requisitions/{requisition_id}/approve-manager")
-async def approve_purchase_request_manager(requisition_id: str, approval_data: Dict[str, Any]):
-    """Manager approves a purchase requisition"""
+@api_router.get("/purchase-requisitions")
+async def get_purchase_requisitions(
+    status: Optional[str] = None,
+    branch_id: Optional[str] = None,
+    limit: int = Query(100, ge=1, le=1000)
+):
+    """Get purchase requisitions with optional filtering"""
+    query = {}
     
-    result = await db.purchase_requisitions.update_one(
-        {"id": requisition_id},
-        {"$set": {
-            "status": "manager_approved",
-            "manager_approved_at": datetime.now(timezone.utc).isoformat(),
-            "manager_approved_by": approval_data.get("approved_by", "Manager"),
-            "manager_notes": approval_data.get("notes", "")
-        }}
-    )
+    if status:
+        query["status"] = status
+    if branch_id:
+        query["branch_id"] = branch_id
     
-    if result.modified_count == 0:
+    requisitions = await db.purchase_requisitions.find(query, {"_id": 0}).sort("requested_at", -1).limit(limit).to_list(limit)
+    return requisitions
+
+@api_router.get("/purchase-requisitions/{requisition_id}")
+async def get_purchase_requisition_by_id(requisition_id: str):
+    """Get a specific purchase requisition by ID"""
+    requisition = await db.purchase_requisitions.find_one({"id": requisition_id}, {"_id": 0})
+    
+    if not requisition:
         raise HTTPException(status_code=404, detail="Purchase requisition not found")
     
-    # Get updated requisition
-    updated = await db.purchase_requisitions.find_one({"id": requisition_id}, {"_id": 0})
-    
-    await log_activity("Manager", "approval", f"Approved purchase requisition {requisition_id}", branch=updated.get("branch_id"))
-    
-    return updated
+    return requisition
+
+# Manager approval removed - managers only handle factory operations, not purchase approvals
 
 @api_router.put("/purchase-requisitions/{requisition_id}/approve-admin")
 async def approve_purchase_request_admin(requisition_id: str, approval_data: Dict[str, Any]):
-    """Admin approves a purchase requisition"""
+    """Admin approves a purchase requisition (up to their threshold)
+    
+    After admin approval, request goes to Finance for payment processing.
+    If amount exceeds admin threshold, it should have been routed to Owner instead.
+    """
+    
+    requisition = await db.purchase_requisitions.find_one({"id": requisition_id}, {"_id": 0})
+    
+    if not requisition:
+        raise HTTPException(status_code=404, detail="Purchase requisition not found")
+    
+    # Check if this should have gone to owner instead
+    estimated_cost = requisition.get("estimated_cost", 0)
+    admin_threshold = requisition.get("admin_threshold", 50000)
+    
+    if estimated_cost > admin_threshold:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Amount (Br {estimated_cost:,.2f}) exceeds admin threshold (Br {admin_threshold:,.2f}). Requires Owner approval."
+        )
     
     result = await db.purchase_requisitions.update_one(
         {"id": requisition_id},
@@ -1495,7 +1580,8 @@ async def approve_purchase_request_admin(requisition_id: str, approval_data: Dic
             "status": "admin_approved",
             "admin_approved_at": datetime.now(timezone.utc).isoformat(),
             "admin_approved_by": approval_data.get("approved_by", "Admin"),
-            "admin_notes": approval_data.get("notes", "")
+            "admin_notes": approval_data.get("notes", ""),
+            "next_step": "finance_payment"
         }}
     )
     
@@ -1505,13 +1591,28 @@ async def approve_purchase_request_admin(requisition_id: str, approval_data: Dic
     # Get updated requisition
     updated = await db.purchase_requisitions.find_one({"id": requisition_id}, {"_id": 0})
     
-    await log_activity("Admin", "approval", f"Approved purchase requisition {requisition_id}", branch=updated.get("branch_id"))
+    await log_activity(
+        "Admin", 
+        "approval", 
+        f"Approved purchase requisition {requisition_id} (Br {estimated_cost:,.2f}) - Sent to Finance for payment", 
+        branch=updated.get("branch_id")
+    )
     
     return updated
 
 @api_router.put("/purchase-requisitions/{requisition_id}/approve-owner")
 async def approve_purchase_request_owner(requisition_id: str, approval_data: Dict[str, Any]):
-    """Owner approves a purchase requisition"""
+    """Owner approves a purchase requisition (for amounts above admin threshold)
+    
+    After owner approval, request goes to Finance for payment processing.
+    """
+    
+    requisition = await db.purchase_requisitions.find_one({"id": requisition_id}, {"_id": 0})
+    
+    if not requisition:
+        raise HTTPException(status_code=404, detail="Purchase requisition not found")
+    
+    estimated_cost = requisition.get("estimated_cost", 0)
     
     result = await db.purchase_requisitions.update_one(
         {"id": requisition_id},
@@ -1519,7 +1620,8 @@ async def approve_purchase_request_owner(requisition_id: str, approval_data: Dic
             "status": "owner_approved",
             "owner_approved_at": datetime.now(timezone.utc).isoformat(),
             "owner_approved_by": approval_data.get("approved_by", "Owner"),
-            "owner_notes": approval_data.get("notes", "")
+            "owner_notes": approval_data.get("notes", ""),
+            "next_step": "finance_payment"
         }}
     )
     
@@ -1529,7 +1631,12 @@ async def approve_purchase_request_owner(requisition_id: str, approval_data: Dic
     # Get updated requisition
     updated = await db.purchase_requisitions.find_one({"id": requisition_id}, {"_id": 0})
     
-    await log_activity("Owner", "approval", f"Approved purchase requisition {requisition_id}", branch=updated.get("branch_id"))
+    await log_activity(
+        "Owner", 
+        "approval", 
+        f"Approved purchase requisition {requisition_id} (Br {estimated_cost:,.2f}) - Sent to Finance for payment", 
+        branch=updated.get("branch_id")
+    )
     
     return updated
 

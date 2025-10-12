@@ -193,8 +193,8 @@ const FinanceDashboard = () => {
     const statusConfig = {
       'completed': { variant: 'success', icon: CheckCircle2, text: 'Completed' },
       'pending': { variant: 'warning', icon: Clock, text: 'Pending' },
-      'owner_approved': { variant: 'default', icon: CheckCircle2, text: 'Ready to Process' },
-      'admin_approved': { variant: 'secondary', icon: Clock, text: 'Awaiting Owner' },
+      'owner_approved': { variant: 'default', icon: CheckCircle2, text: 'Owner Approved - Ready to Pay' },
+      'admin_approved': { variant: 'default', icon: CheckCircle2, text: 'Admin Approved - Ready to Pay' },
       'manager_approved': { variant: 'secondary', icon: Clock, text: 'Awaiting Admin' }
     };
     const config = statusConfig[status] || { variant: 'default', icon: Clock, text: status };
@@ -568,7 +568,7 @@ const FinanceDashboard = () => {
               <CardHeader>
                 <CardTitle>Payments Awaiting Processing</CardTitle>
                 <CardDescription>
-                  Owner-approved purchase requisitions ready for payment
+                  Approved purchase requisitions ready for payment (Admin or Owner approved)
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -598,7 +598,7 @@ const FinanceDashboard = () => {
                           </div>
                         </div>
                       </div>
-                      {approval.status === 'owner_approved' && (
+                      {(approval.status === 'owner_approved' || approval.status === 'admin_approved') && (
                         <div className="flex gap-2 mt-4">
                           <Button 
                             className="bg-green-600 hover:bg-green-700 flex-1"

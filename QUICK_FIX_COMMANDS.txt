@@ -1,0 +1,169 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║              QUICK FIX COMMANDS - Purchase Request Flow                    ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+🎯 WHAT TO DO NOW:
+
+Step 1: Fix Existing Requests in MongoDB
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Option A: Using MongoDB Shell
+──────────────────────────────
+
+mongosh
+use kushukushu_erp
+
+db.purchase_requisitions.updateMany(
+  { status: "pending" },
+  [{
+    $set: {
+      status: {
+        $cond: {
+          if: { $lte: ["$estimated_cost", 50000] },
+          then: "pending_admin_approval",
+          else: "pending_owner_approval"
+        }
+      },
+      routing: {
+        $cond: {
+          if: { $lte: ["$estimated_cost", 50000] },
+          then: "admin",
+          else: "owner"
+        }
+      },
+      admin_threshold: 50000
+    }
+  }]
+)
+
+
+Option B: Using MongoDB Compass
+────────────────────────────────
+
+1. Open MongoDB Compass
+2. Connect to: mongodb://localhost:27017
+3. Select database: kushukushu_erp
+4. Select collection: purchase_requisitions
+5. Click "Aggregations" tab
+6. Paste the aggregation from fix_requests.mongodb.js
+7. Click "Run"
+
+
+Option C: Using Python Script
+──────────────────────────────
+
+Create fix_db.py:
+
+from motor.motor_asyncio import AsyncIOMotorClient
+import asyncio
+
+async def fix():
+    client = AsyncIOMotorClient('mongodb://localhost:27017')
+    db = client['kushukushu_erp']
+    
+    result = await db.purchase_requisitions.update_many(
+        {"status": "pending"},
+        {
+            "$set": {
+                "status": "pending_admin_approval",
+                "routing": "admin",
+                "admin_threshold": 50000
+            }
+        }
+    )
+    
+    print(f"✅ Fixed {result.modified_count} requests")
+    
+asyncio.run(fix())
+
+Then run: python fix_db.py
+
+
+Step 2: Verify the Fix
+━━━━━━━━━━━━━━━━━━━━━━
+
+# Check admin requests
+curl "http://localhost:8000/api/purchase-requisitions?status=pending_admin_approval"
+
+# Should show 7 requests!
+
+
+Step 3: Test Admin Approval
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# Approve one request (replace {id} with actual request ID)
+curl -X PUT http://localhost:8000/api/purchase-requisitions/{id}/approve-admin \
+  -H "Content-Type: application/json" \
+  -d '{"approved_by": "Admin", "notes": "Approved"}'
+
+
+Step 4: Check Finance Queue
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# See approved requests waiting for payment
+curl "http://localhost:8000/api/purchase-requisitions?status=admin_approved"
+
+
+Step 5: Test with New High-Value Request
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# Create request over Br 50,000 (should go to Owner)
+curl -X POST http://localhost:8000/api/purchase-requests \
+  -H "Content-Type: application/json" \
+  -d '{
+    "description": "New Equipment",
+    "item_name": "Packaging Machine",
+    "estimated_cost": 75000,
+    "quantity": 1,
+    "unit": "unit",
+    "supplier_name": "Equipment Co",
+    "requested_by": "Sales Person",
+    "branch_id": "sales_branch"
+  }'
+
+# Check it went to Owner
+curl "http://localhost:8000/api/purchase-requisitions?status=pending_owner_approval"
+
+
+═══════════════════════════════════════════════════════════════════════════
+
+📊 CURRENT SITUATION:
+
+Your 7 pending purchase requests:
+• PR-20251012131929-9340 - Fuel (Br 3,500)
+• PR-20251012131929-110d - Office Supplies (Br 2,500)
+• PR-20251012125352-bf9c - Office Supplies (Br 2,500)
+• PR-20251012120808-035f - (Br 1)
+• PR-20251011212938-be8b - (Br 99.99)
+• ...and 2 more
+
+ALL are under Br 50,000
+→ ALL should go to ADMIN
+→ Just run the MongoDB fix command above!
+
+═══════════════════════════════════════════════════════════════════════════
+
+🔧 WHAT WAS CHANGED IN THE CODE:
+
+✅ backend/server.py:
+   • create_purchase_request() - Auto-routes based on amount
+   • approve_admin() - Checks threshold, approves ≤ Br 50,000
+   • approve_owner() - Approves > Br 50,000
+   • REMOVED approve_manager() - Manager out of chain!
+
+✅ frontend/src/components/owner/ApprovalsScreen.jsx:
+   • Changed to fetch: status=pending_owner_approval
+
+✅ Frontend rebuilt successfully!
+
+═══════════════════════════════════════════════════════════════════════════
+
+📚 DOCUMENTATION:
+
+• PURCHASE_REQUEST_CORRECT_FLOW.md - Full documentation
+• CORRECTED_FLOW_SUMMARY.txt       - Visual summary
+• fix_requests.mongodb.js          - MongoDB fix script
+• QUICK_FIX_COMMANDS.txt           - This file
+
+═══════════════════════════════════════════════════════════════════════════
+

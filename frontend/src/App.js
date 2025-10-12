@@ -13,6 +13,7 @@ import FinancialControlSettings from "./components/owner/FinancialControlSetting
 import InventoryValuationDashboard from "./components/owner/InventoryValuationDashboard";
 import AdminDashboard from "./components/admin/AdminDashboard";
 import UserManagement from "./components/admin/UserManagement";
+import AdminPurchaseApprovals from "./components/admin/AdminPurchaseApprovals";
 import InventoryManagement from "./components/inventory/InventoryManagement";
 import PurchaseRequisitions from "./components/requisitions/PurchaseRequisitions";
 import InternalOrderRequisitions from "./components/requisitions/InternalOrderRequisitions";
@@ -58,6 +59,7 @@ function App() {
           {/* Admin Routes (Web App) */}
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
           <Route path="/admin/users" element={<UserManagement />} />
+          <Route path="/admin/purchase-approvals" element={<AdminPurchaseApprovals />} />
           
           {/* Inventory & Requisitions Routes */}
           <Route path="/inventory" element={<InventoryManagement userRole="store_keeper" />} />
